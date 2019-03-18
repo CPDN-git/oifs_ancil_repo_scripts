@@ -55,12 +55,9 @@ def unpack_upload_file(Args):
             else:
                 for analysis_no in analysis_nos:
                     zipname="ic_"+exptid+"_"+date+"_"+analysis_no
-		    if 'ecmwf' in subdirList:
-                    	print("Removing ecmwf directory...")
-			shutil.rmtree(dirName+"/"+analysis_no+'/ecmwf')
 		    print("Making zipfile "+zipname)
                     shutil.make_archive(zip_dir+zipname,"zip",dirName+"/"+analysis_no) 
-                    output=subprocess.check_output('grib_ls','-w count=1 -p experimentVersionNumber,dataDate,dataTime,M,perturbationNumber ICMSH'+exptid+'INIT') 
+                    #output=subprocess.check_output('grib_ls','-w count=1 -p experimentVersionNumber,dataDate,dataTime,M,perturbationNumber ICMSH'+exptid+'INIT') 
 
 def read_grib_keys():
     gKeys=['experimentVersionNumber','dataDate','dataTime','M','perturbationNumber']
