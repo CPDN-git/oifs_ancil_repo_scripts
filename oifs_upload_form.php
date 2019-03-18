@@ -97,7 +97,6 @@ EOH;
 
 echo '<div class="wrap">';
 echo '<img src="img/logo.png">';
-#echo '<img src="img/Open-IFS-logo-200_0.png"></div>';
 echo '<img src="img/OIFS_Home_logo.png" width="200"></div>';
 echo '<hr>';
 

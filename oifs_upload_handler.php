@@ -49,11 +49,10 @@ EOH;
 
 echo '<div class="wrap">';
 echo '<img src="img/logo.png">';
-#echo '<img src="img/Open-IFS-logo-200_0.png"></div>';
 echo '<img src="img/OIFS_Home_logo.png" width="200"></div>';
 echo '<hr>';
 
-$xml=simplexml_load_file("/storage/boinc/projects/cpdnboinc_alpha/ancil_batch_user_config.xml") or die("Error: Cannot create object");
+$xml=simplexml_load_file("/storage/www/cpdnboinc_alpha/ancil_batch_user_config.xml") or die("Error: Cannot create object");
 $dbhost= $xml->db_host;
 $dbname=$xml->db_name;
 $dbuser= $xml->ancil_user;
@@ -61,9 +60,9 @@ $dbpass= $xml->ancil_passwd;
 
 $user = get_logged_in_user();
 
-$python_env='/usr/bin/python2.7';
-$script_path='/storage/boinc/projects/cpdnboinc_alpha/oifs_ancil_repo_scripts/';
-$tmp_dir='/storage/boinc/projects/cpdnboinc_alpha/tmp_ancil_upload/';
+$python_env='/home/boinc/miniconda2/envs/oifs_pyenv/bin/python';
+$script_path='/storage/www/cpdnboinc_alpha/oifs_ancil_repo_scripts/';
+$tmp_dir='/storage/www/cpdnboinc_alpha/tmp_ancil_upload/';
 
 if (in_array($user->email_addr,$allowed_uploaders)){
         echo "$user->name is logged in<br>";
@@ -104,8 +103,10 @@ if (in_array($user->email_addr,$allowed_uploaders)){
 	}
 	$r = escapeshellcmd( $python_env.' '.$script_path.'oifs_file_upload_handler.py "'.$_POST['created_by'].'"  "'.$user->name.'" "'.$_POST['model_version'].'" "'.$_POST['scenario'].'" "'.$_POST['starting_analysis'].'" "'.$_POST['ancil_type'].'" "'.$_POST['sub_type'].'" "'.$_POST['file_desc'].'" "'.$fileName.'"');
 	echo "$r";
-	$output = shell_exec($r+' 2>&1');
+
+	$output = shell_exec($r);
 	echo "<pre>$output</pre>";
+	
 }
 else {
         die("You are not allowed to visit this page");
