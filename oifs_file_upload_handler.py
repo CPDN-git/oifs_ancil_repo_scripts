@@ -24,18 +24,13 @@ cursor = db.cursor(MySQLdb.cursors.DictCursor)
 def unpack_upload_file(Args):
     dates=[]
     tmp_dir="/storage/www/cpdnboinc_alpha/tmp_ancil_upload/"
+    ancil_dir="/storage/www/cpdnboinc_alpha/oifs_ancil_files/"+Args.ancil_type
     print("Extracting tarfile "+Args.ulfile+" to "+tmp_dir)
     tar= tarfile.open(tmp_dir+Args.ulfile)
     tar.extractall(path=tmp_dir)
     tar.close()
-    #tarfile.extract(tmp_dir+Args.ulfile,extract_dir=tmp_dir)
     exptid=Args.ulfile.split('.')[0].split('_')[0]
     rootDir=tmp_dir+exptid
-
-    # make zip files for upload
-    zip_dir=tmp_dir+exptid+"_zips/"
-    if not os.path.exists(zip_dir):
-        os.makedirs(zip_dir)
 
     # Walk the untarred file and create zips.
     for dirName, subdirList, fileList in os.walk(rootDir, topdown=True):             
@@ -50,51 +45,189 @@ def unpack_upload_file(Args):
             if analysis_nos==[]:
                 analysis_no='00'
                 zipname="ic_"+exptid+"_"+date+"_"+analysis_no
-                print("Making zipfile "+zipname)
-                shutil.make_archive(zip_dir+zipname,"zip",dirName) 
+		adir=ancil_dir+"/"+exptid+"/"+date+"/"+analysis_no+"/"
+		grib_info=get_grib_info(exptid,analysis_no,dirName)
+                if not os.path.exists(adir):
+                        os.makedirs(adir)
+		print("Making zipfile "+zipname)
+		shutil.make_archive(adir+zipname,"zip",dirName)
+	
+		md5_info=subprocess.check_output(['md5sum',adir+zipname+'.zip']) 
+		md5sum=md5_info.split()[0]
+		query=get_query(Args,grib_info,zipname+'.zip',md5sum)
+#		try:
+#			print("Adding "+zipname+".zip to the database")
+#			cursor.execute(query)
+#		        db.commit()
+#		except Exception,e:
+#			print 'Error adding file:',zipname+".zip",e
+#        		db.rollback()
+#			os.remove(adir+zipname+'.zip')
+#			continue
+
             else:
                 for analysis_no in analysis_nos:
                     zipname="ic_"+exptid+"_"+date+"_"+analysis_no
+		    adir=ancil_dir+"/"+exptid+"/"+date+"/"+analysis_no+"/"
+                    grib_info=get_grib_info(exptid,analysis_no,dirName+"/"+analysis_no)
+		    if not os.path.exists(adir):
+                        os.makedirs(adir)
 		    print("Making zipfile "+zipname)
-                    shutil.make_archive(zip_dir+zipname,"zip",dirName+"/"+analysis_no) 
-                    #output=subprocess.check_output('grib_ls','-w count=1 -p experimentVersionNumber,dataDate,dataTime,M,perturbationNumber ICMSH'+exptid+'INIT') 
+		    shutil.make_archive(adir+zipname,"zip",dirName+"/"+analysis_no)
+	
+		    md5_info=subprocess.check_output(['md5sum',adir+zipname+'.zip'])
+                    md5sum=md5_info.split()[0]
+                    query=get_query(Args,grib_info,zipname+'.zip',md5sum)
+#    		    try:
+#                        print("Adding "+zipname+".zip to the database")
+#                        cursor.execute(query)
+#                        db.commit()
+#                    except Exception,e:
+#                        print 'Error adding file:',zipname+".zip",e
+#                        db.rollback()
+#                        os.remove(adir+zipname+'.zip')
+#                        continue
 
-def read_grib_keys():
-    gKeys=['experimentVersionNumber','dataDate','dataTime','M','perturbationNumber']
-    with GribFile(fname,gKeys) as idx:
-        dates = idx.values("dataDate") 
-        times= idx.values("dataTime")
-        hres=idx.values("M")
-        pertNo=idx.values("perturbationNumber")
-        print(dates, times, hre, pertNo)
-        
+    # Cleaning up tmp_dir
+    #print("Cleaning up")
+    #os.remove(tmp_dir+Args.ulfile)
+    #shutil.rmtree(tmp_dir+exptid)
 
-def add_file(Vars):
+def consistency_check(ic_files,exptid,ddir):
+     print("Performing consistency check")
+     expts=[]
+     start_dates=[]
+     for ic_file in ic_files:
+	print("Checking %s file" %ic_file)
+	info=subprocess.check_output(["/home/boinc/eccodes/bin/grib_ls","-w", "count=1", "-p", "experimentVersionNumber,dataDate,dataTime",ddir+"/"+ic_file])
+	lines=info.split("\n")
+	line=lines[2].split()
+        expts.append(line[0])
+	hour=get_hour(line[-1])
+	start_date=line[1]+hour
+	start_dates.append(start_date)
+    # print("Experiment IDs: ",set(expts))
+     assert(len(set(expts))==1),"Inconsistent experiment IDs in initial files"
+     assert(expts[0]==exptid),"Experiment ID (%s) is inconsistent with grib files (%s)" %(exptid,expts[0])
+     
+    # print("Start dates: ",set(start_dates))
+     assert(len(set(start_dates))==1),"Inconsistent start dates in initial files"
+     
+     return start_dates[0]
+	
+def get_grib_info(exptid,analysis_no,ddir):
+    file_info={}
+    ICMSH_file="ICMSH"+exptid+"INIT"
+    ICMGG_file="ICMGG"+exptid+"INIT"
+    ICMGGUA_file="ICMGG"+exptid+"INIUA"
+    ICMCL_file="ICMCL"+exptid+"INIT"
+
+    # Check exptid and start date consistency between files
+#    start_date=consistency_check([ICMSH_file,ICMGG_file,ICMGGUA_file, ICMCL_file],exptid,ddir)
+    start_date=consistency_check([ICMSH_file,ICMGG_file,ICMGGUA_file],exptid,ddir)
     
-    if Vars.sub_type=="":
+    print("Extracting metadata from Grib files")
+    file_info["start_date"]=start_date
+    file_info["exptid"]=exptid
+    file_info["analysis_number"]=analysis_no
+
+    info=subprocess.check_output(["/home/boinc/eccodes/bin/grib_ls","-w", "count=1", "-p", "perturbationNumber,M",ddir+"/"+ICMSH_file])
+    ICMSH_lines=info.split("\n")
+    ICMSH_line=ICMSH_lines[2].split()
+    
+    analysis_num=ICMSH_line[0].zfill(2)
+    # Check analysis number consistent with the file name
+    #assert (analysis_num==analysis_no),"Analysis perturbation number (%s) is inconsistent with ICMSH grib file (%s)" %(analysis_no,analysis_num) 
+
+    ICMSH_hres="T"+ICMSH_line[-1]
+    file_info["spectral_horizontal_resolution"]=ICMSH_hres
+
+    # Get the end date from the ICMCL file
+    info=subprocess.check_output(["/home/boinc/eccodes/bin/grib_ls","-w", "shortName=stl1", "-p", "shortName,dataDate,dataTime",ddir+"/"+ICMCL_file])
+    ICMCL_lines_data=info.split("messages")[0]
+    ICMCL_lines=ICMCL_lines_data.split("\n")
+    ICMCL_line=ICMCL_lines[-2].split()
+    end_hour=get_hour(ICMCL_line[-1])
+    file_info["end_date"]=ICMCL_line[1]+end_hour 
+    
+    # Get the vertical resolution from the ICMSH file
+    info=subprocess.check_output(["/home/boinc/eccodes/bin/grib_ls","-w", "shortName=vo", "-p", "shortName,level",ddir+"/"+ICMSH_file])
+    ICMSH_lines_data=info.split("messages")[0]
+    ICMSH_lines=ICMSH_lines_data.split("\n")
+    ICMSH_line=ICMSH_lines[-2].split()
+    file_info["vertical_resolution"]="L"+ICMSH_line[-1]
+
+    # Get the grid point horizonal resolution
+    info=subprocess.check_output(["/home/boinc/eccodes/bin/grib_ls","-w", "count=1", "-p", "N",ddir+"/"+ICMGG_file])
+    ICMGG_lines=info.split("\n")
+    ICMGG_line=ICMGG_lines[2].split()
+    ICMGG_hres="N"+ICMGG_line[0]
+
+    # Get the grid point horizonal resolution
+    info=subprocess.check_output(["/home/boinc/eccodes/bin/grib_ls","-w", "count=1", "-p", "N",ddir+"/"+ICMGGUA_file])
+    ICMGGUA_lines=info.split("\n")
+    ICMGGUA_line=ICMGGUA_lines[2].split()
+    ICMGGUA_hres="N"+ICMGGUA_line[0]
+    assert (ICMGGUA_hres==ICMGG_hres),"Horizontal resolution in ICMGG grib file (%s) is inconsistent with Upper Air ICMGG grib file (%s)" %(ICMGG_hres,ICMGGUA_hres)
+
+    file_info["gridpoint_horizontal_resolution"]=ICMGG_hres
+
+    print(file_info)
+    return file_info
+
+def get_hour(time):
+    if len(time)==1:
+	hour=time.zfill(2)
+    if len(time)==3:
+	hour=time[0].zfill(2)
+    if len(time)==4:
+	hour=time[0:2]
+    #print("Extracting hour "+hour+" from time "+time)
+    return hour 
+
+def get_query(Vars,GribInfo,fname,md5sum):
+    if Vars.sub_type!="0":
+	url = "http://alpha.cpdn.org/oifs_ancil_files/"+Vars.ancil_type+"/"+Vars.sub_type+"/"+fname
+    else:
         if Vars.ancil_type=="ic_ancil":
-            expt_path=Vars.exptid+"/"+Vars.start_date+Vars.start_time+"/"+Vars.analysis_number+"/"+fname
+            expt_path=GribInfo['exptid']+"/"+GribInfo['start_date']+"/"+GribInfo['analysis_number']+"/"+fname
             url = "http://alpha.cpdn.org/oifs_ancil_files/"+Vars.ancil_type+"/"+expt_path
+	    Vars.file_desc="Initial data files for experiment "+GribInfo['exptid']+" started from "+Vars.starting_analysis
         else:
             url = "http://alpha.cpdn.orgc/oifs_ancil_files/"+Vars.ancil_type+"/"+fname
+
+    query= 'insert into oifs_ancil_files (file_name, created_by, uploaded_by, scenario, description, ancil_type, ancil_sub_type, model_version_number, exptid, starting_analysis, analysis_perturbation_number, start_date, end_date, spectral_horizontal_resolution, gridpoint_horizontal_resolution, vertical_resolution, md5sum, url) '
+    query=query+" values ('"+fname+"','"+Vars.created_by+"','"+Vars.uploaded_by+"','"+Vars.scenario+"','"+Vars.file_desc+"','"+Vars.ancil_type+"',"+Vars.sub_type+",'"+Vars.model_version+"','"+GribInfo['exptid']+"','"+Vars.starting_analysis+"','"+GribInfo['analysis_number']+"','"+GribInfo['start_date']+"','"+GribInfo['end_date']+"','"+GribInfo['spectral_horizontal_resolution']+"','"+GribInfo['gridpoint_horizontal_resolution']+"','"+GribInfo['vertical_resolution']+"','"+md5sum+"','"+url+"')'"
+
+    print(query)
+    return query
+
+def upload_files(Args):
+    
+    tmp_dir="/storage/www/cpdnboinc_alpha/tmp_ancil_upload/"
+    ancil_dir="/storage/www/cpdnboinc_alpha/oifs_ancil_files/"+Args.ancil_type
+    if Args.ancil_type=="ifs_data":
+	adir=ancil_dir+"/"+Args.sub_type
+	url = "http://alpha.cpdn.org/oifs_ancil_files/"+Vars.ancil_type+"/"+Vars.sub_type+"/"+Args.ulname
     else:
-        url = "http://alpha.cpdn.org/oifs_ancil_files/"+Vars.ancil_type+"/"+Vars.sub_type+"/"+fname
+	adir=ancil_dir
+	url = "http://alpha.cpdn.orgc/oifs_ancil_files/"+Vars.ancil_type+"/"+Args.ulname
+    
+#    query= 'insert into oifs_ancil_files (file_name, created_by, uploaded_by, scenario, description, ancil_type, ancil_sub_type, model_version_number, md5sum, url) '
+#    query=query+" values ('"+Vars.file_name+"','"+Vars.created_by+"','"+Vars.uploaded_by+"','"+Vars.scenario+"','"+Vars.description+"','"+Vars.ancil_type+"',"+Vars.sub_type+",'"+Vars.model_version+"','"+md5sum+"','"+url+")"
+#    try:
+#	print("Adding "+Args.ulfile+" to the database")
+#	cursor.execute(query)
+#	print("Moving file into the repository...")
+#        shutil.move(tmp_dir,adir)
+#        db.commit()
+#    except Exception,e:
+#        print 'Error add file:',Args.ulfile,e
+#        db.rollback()
+#        continue
 
-    try:
-        query= 'insert into oifs_ancil_files (file_name, created_by, uploaded_by, scenario, description, ancil_type, ancil_sub_type, model_version_number, exptid, starting_analysis, analysis_perturbation_number, start_date, start_time, end_date, horizontal_resolution, vertical_resolution, md5sum, url, archive_location) '
-        query=query+" values ('"+Vars.file_name+"','"+Vars.created_by+"','"+Vars.uploaded_by+"','"+Vars.scenario+"','"+Vars.description+"','"+Vars.ancil_type+"',"+Vars.sub_type+",'"+Vars.model_version+"','"+Vars.exptid+"','"+Vars.starting_analysis+"','"+Vars.analysis_number+"','"+Vars.start_date+"','"+Vars.start_time+"','"+Vars.end_date+"','"+Vars.horizontal_resolution+"','"+Vars.vertical_resolution+"','"+md5sum+"','"+url+"','"+Vars.archive_location+")"
-
-        print(query)
-    #    if Vars.dry_run==False:
-    #        cursor.execute(query)
-    #        shutil.copyfile(fpath,new_path)
-    #        db.commit()
-    #    except Exception,e:
-    #        print 'Error add file:',fname,e
-    #        db.rollback()
-    #        continue
-    except:
-        print("Query error")
+    
+    
 
 #Main controling function
 def main():
@@ -109,7 +242,14 @@ def main():
     parser.add_argument("file_desc", help="The file description")
     parser.add_argument("ulfile", help="The upload file")
     args = parser.parse_args()
+
+#    if args.ancil_type == "ic_ancil":
     unpack_upload_file(args)
+#    else:
+#	if Args.ulfile.endswith('.zip'):
+#	    upload_file(args)
+#	else:
+#	    print("Please supply a valid zip file")
 
     print('Finished!')
 
