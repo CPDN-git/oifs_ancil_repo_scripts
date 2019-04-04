@@ -10,6 +10,7 @@ import datetime
 import xml.etree.ElementTree as ET
 import tarfile
 import subprocess
+import zipfile
 
 # setup database connection
 db_config='/storage/www/cpdnboinc_alpha/ancil_batch_user_config.xml'
@@ -89,9 +90,9 @@ def unpack_upload_file(Args):
 #                        continue
 
     # Cleaning up tmp_dir
-    #print("Cleaning up")
-    #os.remove(tmp_dir+Args.ulfile)
-    #shutil.rmtree(tmp_dir+exptid)
+    print("Cleaning up")
+    os.remove(tmp_dir+Args.ulfile)
+    shutil.rmtree(tmp_dir+exptid)
 
 def consistency_check(ic_files,exptid,ddir):
      print("Performing consistency check")
@@ -102,7 +103,9 @@ def consistency_check(ic_files,exptid,ddir):
 	info=subprocess.check_output(["/home/boinc/eccodes/bin/grib_ls","-w", "count=1", "-p", "experimentVersionNumber,dataDate,dataTime",ddir+"/"+ic_file])
 	lines=info.split("\n")
 	line=lines[2].split()
-        expts.append(line[0])
+	#Bypass exptid check for ICMCL file as fields can have climatologies with exptid of "0001" and be valid.
+	#if ic_file != ic_files[-1]:
+	expts.append(line[0])
 	hour=get_hour(line[-1])
 	start_date=line[1]+hour
 	start_dates.append(start_date)
@@ -123,7 +126,7 @@ def get_grib_info(exptid,analysis_no,ddir):
     ICMCL_file="ICMCL"+exptid+"INIT"
 
     # Check exptid and start date consistency between files
-#    start_date=consistency_check([ICMSH_file,ICMGG_file,ICMGGUA_file, ICMCL_file],exptid,ddir)
+    #start_date=consistency_check([ICMSH_file,ICMGG_file,ICMGGUA_file, ICMCL_file],exptid,ddir)
     start_date=consistency_check([ICMSH_file,ICMGG_file,ICMGGUA_file],exptid,ddir)
     
     print("Extracting metadata from Grib files")
@@ -192,37 +195,45 @@ def get_query(Vars,GribInfo,fname,md5sum):
         if Vars.ancil_type=="ic_ancil":
             expt_path=GribInfo['exptid']+"/"+GribInfo['start_date']+"/"+GribInfo['analysis_number']+"/"+fname
             url = "http://alpha.cpdn.org/oifs_ancil_files/"+Vars.ancil_type+"/"+expt_path
-	    Vars.file_desc="Initial data files for experiment "+GribInfo['exptid']+" started from "+Vars.starting_analysis
         else:
             url = "http://alpha.cpdn.orgc/oifs_ancil_files/"+Vars.ancil_type+"/"+fname
 
-    query= 'insert into oifs_ancil_files (file_name, created_by, uploaded_by, scenario, description, ancil_type, ancil_sub_type, model_version_number, exptid, starting_analysis, analysis_perturbation_number, start_date, end_date, spectral_horizontal_resolution, gridpoint_horizontal_resolution, vertical_resolution, md5sum, url) '
-    query=query+" values ('"+fname+"','"+Vars.created_by+"','"+Vars.uploaded_by+"','"+Vars.scenario+"','"+Vars.file_desc+"','"+Vars.ancil_type+"',"+Vars.sub_type+",'"+Vars.model_version+"','"+GribInfo['exptid']+"','"+Vars.starting_analysis+"','"+GribInfo['analysis_number']+"','"+GribInfo['start_date']+"','"+GribInfo['end_date']+"','"+GribInfo['spectral_horizontal_resolution']+"','"+GribInfo['gridpoint_horizontal_resolution']+"','"+GribInfo['vertical_resolution']+"','"+md5sum+"','"+url+"')'"
+    query= 'insert into oifs_ancil_files (file_name, created_by, uploaded_by, description, ancil_type, ancil_sub_type, model_version_number, exptid, starting_analysis, analysis_perturbation_number, start_date, end_date, spectral_horizontal_resolution, gridpoint_horizontal_resolution, vertical_resolution, md5sum, url) '
+    query=query+" values ('"+fname+"','"+Vars.created_by+"','"+Vars.uploaded_by+"','"+Vars.file_desc+"','"+Vars.ancil_type+"',"+Vars.sub_type+",'"+Vars.model_version+"','"+GribInfo['exptid']+"','"+Vars.starting_analysis+"','"+GribInfo['analysis_number']+"','"+GribInfo['start_date']+"','"+GribInfo['end_date']+"','"+GribInfo['spectral_horizontal_resolution']+"','"+GribInfo['gridpoint_horizontal_resolution']+"','"+GribInfo['vertical_resolution']+"','"+md5sum+"','"+url+"')'"
 
     print(query)
     return query
 
-def upload_files(Args):
-    
+def upload_file(Vars):
     tmp_dir="/storage/www/cpdnboinc_alpha/tmp_ancil_upload/"
-    ancil_dir="/storage/www/cpdnboinc_alpha/oifs_ancil_files/"+Args.ancil_type
-    if Args.ancil_type=="ifs_data":
-	adir=ancil_dir+"/"+Args.sub_type
-	url = "http://alpha.cpdn.org/oifs_ancil_files/"+Vars.ancil_type+"/"+Vars.sub_type+"/"+Args.ulname
+    ulfile_zip=zipfile.ZipFile(tmp_dir+Vars.ulfile)
+    ret=ulfile_zip.testzip()
+    assert(ret is None),"Bad zip file. First bad file in zip: %s" % ret
+
+    print("Uploading file...")    
+    ancil_dir="/storage/www/cpdnboinc_alpha/oifs_ancil_files/"+Vars.ancil_type
+    md5_info=subprocess.check_output(['md5sum',tmp_dir+Vars.ulfile])
+    md5sum=md5_info.split()[0]
+    
+    if Vars.ancil_type=="ifsdata":
+	adir=ancil_dir+"/"+Vars.sub_type
+	url = "http://alpha.cpdn.org/oifs_ancil_files/"+Vars.ancil_type+"/"+Vars.sub_type+"/"+Vars.ulfile
     else:
 	adir=ancil_dir
-	url = "http://alpha.cpdn.orgc/oifs_ancil_files/"+Vars.ancil_type+"/"+Args.ulname
-    
-#    query= 'insert into oifs_ancil_files (file_name, created_by, uploaded_by, scenario, description, ancil_type, ancil_sub_type, model_version_number, md5sum, url) '
-#    query=query+" values ('"+Vars.file_name+"','"+Vars.created_by+"','"+Vars.uploaded_by+"','"+Vars.scenario+"','"+Vars.description+"','"+Vars.ancil_type+"',"+Vars.sub_type+",'"+Vars.model_version+"','"+md5sum+"','"+url+")"
+	url = "http://alpha.cpdn.orgc/oifs_ancil_files/"+Vars.ancil_type+"/"+Vars.ulfile
+    query= 'insert into oifs_ancil_files (file_name, created_by, uploaded_by, description, ancil_type, ancil_sub_type, model_version_number, md5sum, url) '
+    query=query+" values ('"+Vars.ulfile+"','"+Vars.created_by+"','"+Vars.uploaded_by+"','"+Vars.file_desc+"','"+Vars.ancil_type+"',"+Vars.sub_type+",'"+Vars.model_version+"','"+md5sum+"','"+url+"')'"
+
+    print(query)
+
 #    try:
-#	print("Adding "+Args.ulfile+" to the database")
+#	print("Adding "+Vars.ulfile+" to the database")
 #	cursor.execute(query)
 #	print("Moving file into the repository...")
 #        shutil.move(tmp_dir,adir)
 #        db.commit()
 #    except Exception,e:
-#        print 'Error add file:',Args.ulfile,e
+#        print 'Error add file:',Vars.ulfile,e
 #        db.rollback()
 #        continue
 
@@ -235,7 +246,6 @@ def main():
     parser.add_argument("created_by", help="The person who created the file")
     parser.add_argument("uploaded_by", help="The persion who uploaded the file")
     parser.add_argument("model_version", help="The model version number")
-    parser.add_argument("scenario", help="The case study description / scenario")
     parser.add_argument("starting_analysis", help="The model starting analysis")
     parser.add_argument("ancil_type", help="The ancillary file type")
     parser.add_argument("sub_type", help="The ancillary file sub-type")
@@ -243,13 +253,10 @@ def main():
     parser.add_argument("ulfile", help="The upload file")
     args = parser.parse_args()
 
-#    if args.ancil_type == "ic_ancil":
-    unpack_upload_file(args)
-#    else:
-#	if Args.ulfile.endswith('.zip'):
-#	    upload_file(args)
-#	else:
-#	    print("Please supply a valid zip file")
+    if args.ancil_type == "ic_ancil":
+        unpack_upload_file(args)
+    else:
+	upload_file(args)
 
     print('Finished!')
 

@@ -30,6 +30,7 @@ echo <<<EOH
 <META NAME="ROBOTS" CONTENT="NOINDEV, NOFOLLOW">
 <script type="text/javascript" src="jquery/jquery-latest.js"></script>
 <script type="text/javascript" src="jquery/jquery.tablesorter.js"></script>
+<script type="text/javascript" src="../js/plupload.full.min.js"></script>
 <script type="text/javascript">
                         $(document).ready(function() {
                                 $("#myTable").tablesorter();
@@ -42,43 +43,28 @@ echo <<<EOH
 	case 'ic_ancil':
                 document.getElementById("ic_ancil_descriptions").style.display = 'block';
 		document.getElementById("subType").style.display = 'none';
-		document.getElementById("file_description").style.display = 'none';
-		document.getElementById("sub_type").value = 0;
+		document.getElementById("sub_type").value = "0";
 		document.getElementById("file_desc").value = "";
 	break;
         case 'ifsdata':
                 document.getElementById("subType").style.display = 'block';
-                document.getElementById("file_description").style.display = 'block';
 		document.getElementById("ic_ancil_descriptions").style.display = 'none';
-		document.getElementById("ICMSH_desc").value = "";
-		document.getElementById("ICMGG_surface_desc").value = "";
-		document.getElementById("ICMGG_upper_air_desc").value = "";
-		document.getElementById("ICMCL_desc").value = "";
-		document.getElementById("wave_desc").value = "";
+		document.getElementById("starting_analysis").value = "0";
+		document.getElementById("file_desc").value = "";
         break;
         case 'climate_data':
-                document.getElementById("file_description").style.display = 'block';
 		document.getElementById("subType").style.display = 'none';
                 document.getElementById("ic_ancil_descriptions").style.display = 'none';
-		document.getElementById("sub_type").value = 0;
+		document.getElementById("sub_type").value = "0";
+		document.getElementById("starting_analysis").value = "0";
 		document.getElementById("file_desc").value = "";
-		document.getElementById("ICMSH_desc").value = "";
-                document.getElementById("ICMGG_surface_desc").value = "";
-                document.getElementById("ICMGG_upper_air_desc").value = "";
-                document.getElementById("ICMCL_desc").value = "";
-                document.getElementById("wave_desc").value = "";
         break;
 	default:
-		document.getElementById("file_description").style.display = 'none';
                 document.getElementById("subType").style.display = 'none';
                 document.getElementById("ic_ancil_descriptions").style.display = 'none';
-		document.getElementById("sub_type").value = 0;
+		document.getElementById("sub_type").value = "0";
+		document.getElementById("starting_analysis").value = "0";
                 document.getElementById("file_desc").value = "";
-		document.getElementById("ICMSH_desc").value = "";
-                document.getElementById("ICMGG_surface_desc").value = "";
-                document.getElementById("ICMGG_upper_air_desc").value = "";
-                document.getElementById("ICMCL_desc").value = "";
-                document.getElementById("wave_desc").value = "";
 	}
 }
 </script>
@@ -108,20 +94,19 @@ $user = get_logged_in_user();
 	echo "<p>$user->name is logged in";
 	?>
 	<p>Enter the following information to upload your experiment file(s)</p>
-	<form action="oifs_upload_handler.php" method="post" enctype="multipart/form-data" upload_max_filesize=300000000 post_max_size=500000000>
+	<form id="upload_form" name="upload_form" action="oifs_upload_handler.php" method="post" enctype="multipart/form-data" upload_max_filesize=300000000 post_max_size=500000000>
 	Created by: <input type="text" name="created_by">
 	Model version: <select name="model_version" class="dropdown">
 		<option value="0">Select</option>
 		<option value='40r1'>40r1</option>
 		<option value='43r3'>43r3</option>
-		</select><br><br>
-	Case study scenario description: <p> <textarea name="scenario" rows="3" cols="80"></textarea><br><br>
+		</select>
 	File type: <select id="ancil_type" name="ancil_type" class="dropdown" onchange="condDisp(this.value);">
   		<option value="0">Select</option>
 		<option value="ic_ancil">initial files</option>
   		<option value="ifsdata">ifsdata</option>
  		<option value="climate_data">climate_data</option>
-		</select>
+		</select><br><br>
 	
 	<div id="subType" name="subType" style="display: none;">
 	Sub type: <select id="sub_type" name="sub_type" class="dropdown">
@@ -132,12 +117,8 @@ $user = get_logged_in_user();
                 </select><br><br>	
 	</div>
 	
-	<div id="file_description" name="file_description" style="display: none;">
-	File description: <p> <textarea id="file_desc" name="file_desc" rows="3" cols="80"></textarea><br><br>	
-	</div>
-	
 	<div id="ic_ancil_descriptions" name="ic_ancil_descriptions" style="display: none;">
-	Starting analysis: <select name="starting_analysis" class="dropdown">
+	Starting analysis: <select id="starting_analysis" name="starting_analysis" class="dropdown">
                 <option value="0">Select</option>
                 <option value="Operational">Operational</option>
                 <option value="ERA5">ERA5</option>
@@ -145,12 +126,89 @@ $user = get_logged_in_user();
                 <option value="Other">Other</option>
                 </select><br><br>
 	</div>
+	
+	Case study scenario / Description: <p> <textarea name="file_desc" rows="3" cols="80"></textarea><br><br>
 
-	Upload file here: <input name="upload" type="file"><br><br>
-	<input type="submit">
-	</form>
+	<div id="filelist">Your browser doesn't have Flash, Silverlight or HTML5 support.</div>
+	<br />
+ 
+	<br />
+	<pre id="console"></pre>
 
+	<div id="container">
+	Upload file here: <input id="pickfiles" name="file" type="file" href="javascript:;"><br><br>
+	<input id="uploadfiles" type="submit" href="javascript:;">
+	</div>
 
+	<input type="hidden" id="fileName" name="fileName" value="">
+<form>
+
+<script type="text/javascript">
+// Custom example logic
+ 
+var uploader = new plupload.Uploader({
+    runtimes : 'html5,silverlight,html4',
+     
+    browse_button : 'pickfiles', // you can pass in id...
+    container: document.getElementById('container'), // ... or DOM Element itself
+    multi_selection: false,     
+    url : "../plupload_handler.php",
+    chunk_size : '10mb',
+
+    filters : {
+        max_file_size : '2gb',
+	
+        mime_types: [
+            {title : "Zip files", extensions : "zip,tgz,gz"}
+        ]
+    },
+ 
+    // Flash settings
+    flash_swf_url : '../js/Moxie.swf',
+ 
+    // Silverlight settings
+    silverlight_xap_url : '../js/Moxie.xap',
+     
+ 
+    init: {
+        PostInit: function() {
+            document.getElementById('filelist').innerHTML = '';
+ 
+            document.getElementById('uploadfiles').onclick = function() {
+                uploader.start();
+                return false;
+            };
+        },
+ 
+        FilesAdded: function(up, files) {
+            plupload.each(files, function(file) {
+		document.getElementById("fileName").value = file.name;
+                document.getElementById('filelist').innerHTML += '<div id="' + file.id + '">' + file.name + ' (' + plupload.formatSize(file.size) + ') <b></b></div>';
+            });
+        },
+ 
+        UploadProgress: function(up, file) {
+            document.getElementById(file.id).getElementsByTagName('b')[0].innerHTML = '<span>' + file.percent + "%</span>";
+        },
+
+	FileUploaded: function(up, file) {
+	},
+	
+	ChunkUploaded: function(up, file, info) {
+	},
+
+	UploadComplete: function() {
+		document.getElementById('upload_form').submit();
+	},
+        Error: function(up, err) {
+            document.getElementById('console').innerHTML += "\nError #" + err.code + ": " + err.message;
+        }
+    }
+});
+
+uploader.init();
+
+</script>
 <?php 
 #}
 #else {
