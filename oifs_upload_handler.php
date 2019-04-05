@@ -27,7 +27,7 @@ require_once("../inc/oifs_uploaders.inc");
 echo <<<EOH
 <html>
 <head>
-<title>OpenIFS Ancil upload form</title>
+<title>OpenIFS@home Ancil upload form</title>
 <script type="text/javascript" src="jquery/jquery-latest.js"></script>
 <script type="text/javascript" src="jquery/jquery.tablesorter.js"></script>
 <script type="text/javascript">
@@ -85,7 +85,7 @@ if (in_array($user->email_addr,$allowed_uploaders)){
 	echo '<p>Uploaded file: '.$fileName.'</p>';
 	$md5_value=md5_file($tmp_dir.$fileName);
         echo '<p style=color:green;>md5 checksum: '.$md5_value.'</p>';
-	
+
 	$r = escapeshellcmd( $python_env.' '.$script_path.'oifs_file_upload_handler.py "'.$_POST['created_by'].'"  "'.$user->name.'" "'.$_POST['model_version'].'" "'.$_POST['starting_analysis'].'" "'.$_POST['ancil_type'].'" "'.$_POST['sub_type'].'" "'.$_POST['file_desc'].'" "'.$fileName.'"');
 
 	$output = shell_exec($r);

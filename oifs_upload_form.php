@@ -26,7 +26,7 @@ require_once("../inc/oifs_uploaders.inc");
 echo <<<EOH
 <html>
 <head>
-<title>CPDN Ancil upload form</title>
+<title>OpenIFS@home Ancil upload form</title>
 <META NAME="ROBOTS" CONTENT="NOINDEV, NOFOLLOW">
 <script type="text/javascript" src="jquery/jquery-latest.js"></script>
 <script type="text/javascript" src="jquery/jquery.tablesorter.js"></script>
@@ -59,6 +59,13 @@ echo <<<EOH
 		document.getElementById("starting_analysis").value = "0";
 		document.getElementById("file_desc").value = "";
         break;
+	case 'fullpos_namelist':
+                document.getElementById("subType").style.display = 'none';
+                document.getElementById("ic_ancil_descriptions").style.display = 'none';
+                document.getElementById("sub_type").value = "0";
+                document.getElementById("starting_analysis").value = "0";
+                document.getElementById("file_desc").value = "";
+        break;
 	default:
                 document.getElementById("subType").style.display = 'none';
                 document.getElementById("ic_ancil_descriptions").style.display = 'none';
@@ -90,7 +97,7 @@ $max_post_size = ini_get('post_max_size');
 #echo $max_post_size;
 
 $user = get_logged_in_user();
-#if (in_array($user->email_addr,$allowed_uploaders)){
+if (in_array($user->email_addr,$allowed_uploaders)){
 	echo "<p>$user->name is logged in";
 	?>
 	<p>Enter the following information to upload your experiment file(s)</p>
@@ -106,6 +113,7 @@ $user = get_logged_in_user();
 		<option value="ic_ancil">initial files</option>
   		<option value="ifsdata">ifsdata</option>
  		<option value="climate_data">climate_data</option>
+		<option value="fullpos_namelist">FullPos namelist</option>
 		</select><br><br>
 	
 	<div id="subType" name="subType" style="display: none;">
@@ -136,7 +144,7 @@ $user = get_logged_in_user();
 	<pre id="console"></pre>
 
 	<div id="container">
-	Upload file here: <input id="pickfiles" name="file" type="file" href="javascript:;"><br><br>
+	Upload file here: <input id="pickfiles" type="file"  href="javascript:;"><br><br>
 	<input id="uploadfiles" type="submit" href="javascript:;">
 	</div>
 
@@ -147,11 +155,11 @@ $user = get_logged_in_user();
 // Custom example logic
  
 var uploader = new plupload.Uploader({
-    runtimes : 'html5,silverlight,html4',
+    runtimes : 'html5,flash,silverlight,html4',
      
     browse_button : 'pickfiles', // you can pass in id...
     container: document.getElementById('container'), // ... or DOM Element itself
-    multi_selection: false,     
+  //  multi_selection: false,     
     url : "../plupload_handler.php",
     chunk_size : '10mb',
 
@@ -182,7 +190,7 @@ var uploader = new plupload.Uploader({
  
         FilesAdded: function(up, files) {
             plupload.each(files, function(file) {
-		document.getElementById("fileName").value = file.name;
+		document.getElementById('fileName').value = file.name ;
                 document.getElementById('filelist').innerHTML += '<div id="' + file.id + '">' + file.name + ' (' + plupload.formatSize(file.size) + ') <b></b></div>';
             });
         },
@@ -210,9 +218,9 @@ uploader.init();
 
 </script>
 <?php 
-#}
-#else {
-#	echo "You are not allowed to visit this page";
-#	}
+}
+else {
+	echo "You are not allowed to visit this page";
+	}
 
 ?>

@@ -56,15 +56,15 @@ def unpack_upload_file(Args):
 		md5_info=subprocess.check_output(['md5sum',adir+zipname+'.zip']) 
 		md5sum=md5_info.split()[0]
 		query=get_query(Args,grib_info,zipname+'.zip',md5sum)
-#		try:
-#			print("Adding "+zipname+".zip to the database")
-#			cursor.execute(query)
-#		        db.commit()
-#		except Exception,e:
-#			print 'Error adding file:',zipname+".zip",e
-#        		db.rollback()
-#			os.remove(adir+zipname+'.zip')
-#			continue
+		try:
+			print("Adding "+zipname+".zip to the database")
+			cursor.execute(query)
+		        db.commit()
+		except Exception,e:
+			print 'Error adding file:',zipname+".zip",e
+        		db.rollback()
+			os.remove(adir+zipname+'.zip')
+			continue
 
             else:
                 for analysis_no in analysis_nos:
@@ -79,15 +79,15 @@ def unpack_upload_file(Args):
 		    md5_info=subprocess.check_output(['md5sum',adir+zipname+'.zip'])
                     md5sum=md5_info.split()[0]
                     query=get_query(Args,grib_info,zipname+'.zip',md5sum)
-#    		    try:
-#                        print("Adding "+zipname+".zip to the database")
-#                        cursor.execute(query)
-#                        db.commit()
-#                    except Exception,e:
-#                        print 'Error adding file:',zipname+".zip",e
-#                        db.rollback()
-#                        os.remove(adir+zipname+'.zip')
-#                        continue
+    		    try:
+                        print("Adding "+zipname+".zip to the database")
+                        cursor.execute(query)
+                        db.commit()
+                    except Exception,e:
+                        print 'Error adding file:',zipname+".zip",e
+                        db.rollback()
+                        os.remove(adir+zipname+'.zip')
+                        continue
 
     # Cleaning up tmp_dir
     print("Cleaning up")
@@ -199,7 +199,7 @@ def get_query(Vars,GribInfo,fname,md5sum):
             url = "http://alpha.cpdn.orgc/oifs_ancil_files/"+Vars.ancil_type+"/"+fname
 
     query= 'insert into oifs_ancil_files (file_name, created_by, uploaded_by, description, ancil_type, ancil_sub_type, model_version_number, exptid, starting_analysis, analysis_perturbation_number, start_date, end_date, spectral_horizontal_resolution, gridpoint_horizontal_resolution, vertical_resolution, md5sum, url) '
-    query=query+" values ('"+fname+"','"+Vars.created_by+"','"+Vars.uploaded_by+"','"+Vars.file_desc+"','"+Vars.ancil_type+"',"+Vars.sub_type+",'"+Vars.model_version+"','"+GribInfo['exptid']+"','"+Vars.starting_analysis+"','"+GribInfo['analysis_number']+"','"+GribInfo['start_date']+"','"+GribInfo['end_date']+"','"+GribInfo['spectral_horizontal_resolution']+"','"+GribInfo['gridpoint_horizontal_resolution']+"','"+GribInfo['vertical_resolution']+"','"+md5sum+"','"+url+"')'"
+    query=query+" values ('"+fname+"','"+Vars.created_by+"','"+Vars.uploaded_by+"','"+Vars.file_desc+"','"+Vars.ancil_type+"',"+Vars.sub_type+",'"+Vars.model_version+"','"+GribInfo['exptid']+"','"+Vars.starting_analysis+"','"+GribInfo['analysis_number']+"','"+GribInfo['start_date']+"','"+GribInfo['end_date']+"','"+GribInfo['spectral_horizontal_resolution']+"','"+GribInfo['gridpoint_horizontal_resolution']+"','"+GribInfo['vertical_resolution']+"','"+md5sum+"','"+url+"')"
 
     print(query)
     return query
@@ -222,20 +222,19 @@ def upload_file(Vars):
 	adir=ancil_dir
 	url = "http://alpha.cpdn.orgc/oifs_ancil_files/"+Vars.ancil_type+"/"+Vars.ulfile
     query= 'insert into oifs_ancil_files (file_name, created_by, uploaded_by, description, ancil_type, ancil_sub_type, model_version_number, md5sum, url) '
-    query=query+" values ('"+Vars.ulfile+"','"+Vars.created_by+"','"+Vars.uploaded_by+"','"+Vars.file_desc+"','"+Vars.ancil_type+"',"+Vars.sub_type+",'"+Vars.model_version+"','"+md5sum+"','"+url+"')'"
+    query=query+" values ('"+Vars.ulfile+"','"+Vars.created_by+"','"+Vars.uploaded_by+"','"+Vars.file_desc+"','"+Vars.ancil_type+"',"+Vars.sub_type+",'"+Vars.model_version+"','"+md5sum+"','"+url+"')"
 
     print(query)
 
-#    try:
-#	print("Adding "+Vars.ulfile+" to the database")
-#	cursor.execute(query)
-#	print("Moving file into the repository...")
-#        shutil.move(tmp_dir,adir)
-#        db.commit()
-#    except Exception,e:
-#        print 'Error add file:',Vars.ulfile,e
-#        db.rollback()
-#        continue
+    try:
+	print("Adding "+Vars.ulfile+" to the database")
+	cursor.execute(query)
+	print("Moving file into the repository...")
+        shutil.move(tmp_dir,adir)
+        db.commit()
+    except Exception,e:
+        print 'Error add file:',Vars.ulfile,e
+        db.rollback()
 
     
     
