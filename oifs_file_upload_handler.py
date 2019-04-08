@@ -204,15 +204,16 @@ def get_query(Vars,GribInfo,fname,md5sum):
 
 def upload_file(Vars):
     tmp_dir="/storage/www/cpdnboinc_alpha/tmp_ancil_upload/"
-    ulfile_zip=zipfile.ZipFile(tmp_dir+Vars.ulfile)
-    ret=ulfile_zip.testzip()
-    assert(ret is None),"Bad zip file. First bad file in zip: %s" % ret
+    if Vars.ancil_type!="fullpos_namelist":
+    	ulfile_zip=zipfile.ZipFile(tmp_dir+Vars.ulfile)
+    	ret=ulfile_zip.testzip()
+    	assert(ret is None),"Bad zip file. First bad file in zip: %s" % ret
 
     print("Uploading file...")    
     ancil_dir="/storage/www/cpdnboinc_alpha/oifs_ancil_files/"+Vars.ancil_type
     md5_info=subprocess.check_output(['md5sum',tmp_dir+Vars.ulfile])
     md5sum=md5_info.split()[0]
-    
+   
     if Vars.ancil_type=="ifsdata":
 	adir=ancil_dir+"/"+Vars.sub_type
 	url = "http://alpha.cpdn.org/oifs_ancil_files/"+Vars.ancil_type+"/"+Vars.sub_type+"/"+Vars.ulfile
@@ -221,12 +222,11 @@ def upload_file(Vars):
 	url = "http://alpha.cpdn.orgc/oifs_ancil_files/"+Vars.ancil_type+"/"+Vars.ulfile
     query= 'insert into oifs_ancil_files (file_name, created_by, uploaded_by, description, ancil_type, ancil_sub_type, model_version_number, md5sum, url) '
     query=query+" values ('"+Vars.ulfile+"','"+Vars.created_by+"','"+Vars.uploaded_by+"','"+Vars.file_desc+"','"+Vars.ancil_type+"',"+Vars.sub_type+",'"+Vars.model_version+"','"+md5sum+"','"+url+"')"
-
     try:
 	print("Adding "+Vars.ulfile+" to the database")
 	cursor.execute(query)
 	print("Moving file into the repository...")
-        shutil.move(tmp_dir,adir)
+        shutil.move(tmp_dir+Vars.ulfile,adir)
         db.commit()
     except Exception,e:
         print 'Error add file:',Vars.ulfile,e
