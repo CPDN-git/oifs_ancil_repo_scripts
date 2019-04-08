@@ -25,11 +25,10 @@ echo <<<EOH
 <body>
 EOH;
 
+echo '<div class="wrap">';
 echo '<img src="img/logo.png">';
+echo '<img src="img/OIFS_Home_logo.png" width="200"></div>';
 echo '<hr>';
-
-
-
 
 $xml=simplexml_load_file("/storage/www/cpdnboinc_alpha/ancil_batch_user_config.xml") or die("Error: Cannot create object");
 $host= $xml->db_host;
