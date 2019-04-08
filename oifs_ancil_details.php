@@ -25,9 +25,13 @@ echo <<<EOH
 <body>
 EOH;
 
-echo '<div class="wrap">';
-echo '<img src="img/logo.png">';
-echo '<img src="img/OIFS_Home_logo.png" width="200"></div>';
+echo '<div class="wrap" style="width:100%">';
+echo '<div style="width:100%">';
+echo '<img src="img/OIFS_Home_logo.png" alt="OpenIFS@home" style="width:200px">';
+echo '<img src="img/CPDN_logo_abbrv_sq.png" alt="CPDN" style="width:90px; float:right;">';
+echo '</div>';
+echo '<div style="clear: both;"></div>';
+echo '</div>';
 echo '<hr>';
 
 $xml=simplexml_load_file("/storage/www/cpdnboinc_alpha/ancil_batch_user_config.xml") or die("Error: Cannot create object");

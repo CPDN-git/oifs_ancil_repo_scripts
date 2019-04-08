@@ -88,9 +88,13 @@ echo <<<EOH
 <body>
 EOH;
 
-echo '<div class="wrap">';
-echo '<img src="img/logo.png">';
-echo '<img src="img/OIFS_Home_logo.png" width="200"></div>';
+echo '<div class="wrap" style="width:100%">';
+echo '<div style="width:100%">';
+echo '<img src="img/OIFS_Home_logo.png" alt="OpenIFS@home" style="width:200px">';
+echo '<img src="img/CPDN_logo_abbrv_sq.png" alt="CPDN" style="width:90px; float:right;">';
+echo '</div>';
+echo '<div style="clear: both;"></div>';
+echo '</div>';
 echo '<hr>';
 
 $max_post_size = ini_get('post_max_size');
