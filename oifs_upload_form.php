@@ -148,7 +148,7 @@ if (in_array($user->email_addr,$allowed_uploaders)){
 	<pre id="console"></pre>
 
 	<div id="container">
-	Upload file here: <input id="pickfiles" type="file"  href="javascript:;"><br><br>
+	Upload file here: <input id="pickfiles" type="file" href="javascript:;"><br><br>
 	<input id="uploadfiles" type="submit" href="javascript:;">
 	</div>
 
@@ -169,9 +169,10 @@ var uploader = new plupload.Uploader({
 
     filters : {
         max_file_size : '2gb',
-	
+
         mime_types: [
-            {title : "Zip files", extensions : "zip,tgz,gz"}
+            {title : "Zip files", extensions : "zip,tgz"},
+	    {title : "Namelist files", extensions : "fps"}
         ]
     },
  
