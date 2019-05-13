@@ -34,7 +34,7 @@ echo '<div style="clear: both;"></div>';
 echo '</div>';
 echo '<hr>';
 
-$xml=simplexml_load_file("/storage/www/cpdnboinc_alpha/ancil_batch_user_config.xml") or die("Error: Cannot create object");
+$xml=simplexml_load_file("/storage/www/cpdnboinc_dev/ancil_batch_user_config.xml") or die("Error: Cannot create object");
 $host= $xml->db_host;
 $dbname=$xml->db_name;
 $user= $xml->db_user;

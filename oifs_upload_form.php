@@ -104,7 +104,7 @@ $user = get_logged_in_user();
 if (in_array($user->email_addr,$allowed_uploaders)){
 	echo "<p>$user->name is logged in";
 	?>
-	<p>Enter the following information to upload your experiment file(s)</p>
+	<p>Enter the following information to upload your experiment file(s).</p>
 	<form id="upload_form" name="upload_form" action="oifs_upload_handler.php" method="post" enctype="multipart/form-data" upload_max_filesize=300000000 post_max_size=500000000>
 	Created by: <input type="text" name="created_by">
 	Model version: <select name="model_version" class="dropdown">
@@ -114,10 +114,10 @@ if (in_array($user->email_addr,$allowed_uploaders)){
 		</select>
 	File type: <select id="ancil_type" name="ancil_type" class="dropdown" onchange="condDisp(this.value);">
   		<option value="0">Select</option>
-		<option value="ic_ancil">initial files</option>
-  		<option value="ifsdata">ifsdata</option>
- 		<option value="climate_data">climate_data</option>
-		<option value="fullpos_namelist">FullPos namelist</option>
+		<option value="ic_ancil">initial files (as .tgz)</option>
+  		<option value="ifsdata">ifsdata (as .zip) </option>
+ 		<option value="climate_data">climate_data (as .zip)</option>
+		<option value="fullpos_namelist">FullPos namelist (as .fps)</option>
 		</select><br><br>
 	
 	<div id="subType" name="subType" style="display: none;">
@@ -130,6 +130,7 @@ if (in_array($user->email_addr,$allowed_uploaders)){
 	</div>
 	
 	<div id="ic_ancil_descriptions" name="ic_ancil_descriptions" style="display: none;">
+	<p>Note initial files are uploaded as a .tgz file with the directory structure [exptid]/[start date time]/[analysis perturbation number]/[files].<br>Multiple dates and analysis numbers can be included in a single upload tarball.  The analysis perturbation number directory can be ommited if only one exists.</p>
 	Starting analysis: <select id="starting_analysis" name="starting_analysis" class="dropdown">
                 <option value="0">Select</option>
                 <option value="Operational">Operational</option>

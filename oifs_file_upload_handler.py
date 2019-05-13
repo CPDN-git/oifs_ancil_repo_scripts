@@ -12,8 +12,10 @@ import tarfile
 import subprocess
 import zipfile
 
+site='dev'
+
 # setup database connection
-db_config='/storage/www/cpdnboinc_alpha/ancil_batch_user_config.xml'
+db_config='/storage/www/cpdnboinc_'+site+'/ancil_batch_user_config.xml'
 tree=ET.parse(db_config)
 db_host=tree.find('db_host').text
 db_user=tree.find('db_user').text
@@ -24,8 +26,8 @@ cursor = db.cursor(MySQLdb.cursors.DictCursor)
 
 def unpack_upload_file(Args):
     dates=[]
-    tmp_dir="/storage/www/cpdnboinc_alpha/tmp_ancil_upload/"
-    ancil_dir="/storage/www/cpdnboinc_alpha/oifs_ancil_files/"+Args.ancil_type
+    tmp_dir="/storage/www/cpdnboinc_"+site+"/tmp_ancil_upload/"
+    ancil_dir="/storage/www/cpdnboinc_"+site+"/oifs_ancil_files/"+Args.ancil_type
     print("Extracting tarfile "+Args.ulfile+" to "+tmp_dir)
     tar= tarfile.open(tmp_dir+Args.ulfile)
     tar.extractall(path=tmp_dir)
@@ -189,13 +191,13 @@ def get_hour(time):
 
 def get_query(Vars,GribInfo,fname,md5sum):
     if Vars.sub_type!="0":
-	url = "http://alpha.cpdn.org/oifs_ancil_files/"+Vars.ancil_type+"/"+Vars.sub_type+"/"+fname
+	url = "http://"+site+".cpdn.org/oifs_ancil_files/"+Vars.ancil_type+"/"+Vars.sub_type+"/"+fname
     else:
         if Vars.ancil_type=="ic_ancil":
             expt_path=GribInfo['exptid']+"/"+GribInfo['start_date']+"/"+GribInfo['analysis_number']+"/"+fname
-            url = "http://alpha.cpdn.org/oifs_ancil_files/"+Vars.ancil_type+"/"+expt_path
+            url = "http://"+site+".cpdn.org/oifs_ancil_files/"+Vars.ancil_type+"/"+expt_path
         else:
-            url = "http://alpha.cpdn.orgc/oifs_ancil_files/"+Vars.ancil_type+"/"+fname
+            url = "http://"+site+".cpdn.org/oifs_ancil_files/"+Vars.ancil_type+"/"+fname
 
     query= 'insert into oifs_ancil_files (file_name, created_by, uploaded_by, description, ancil_type, ancil_sub_type, model_version_number, exptid, starting_analysis, analysis_perturbation_number, start_date, end_date, spectral_horizontal_resolution, gridpoint_horizontal_resolution, vertical_resolution, md5sum, url) '
     query=query+" values ('"+fname+"','"+Vars.created_by+"','"+Vars.uploaded_by+"','"+Vars.file_desc+"','"+Vars.ancil_type+"',"+Vars.sub_type+",'"+Vars.model_version+"','"+GribInfo['exptid']+"','"+Vars.starting_analysis+"','"+GribInfo['analysis_number']+"','"+GribInfo['start_date']+"','"+GribInfo['end_date']+"','"+GribInfo['spectral_horizontal_resolution']+"','"+GribInfo['gridpoint_horizontal_resolution']+"','"+GribInfo['vertical_resolution']+"','"+md5sum+"','"+url+"')"
@@ -203,23 +205,23 @@ def get_query(Vars,GribInfo,fname,md5sum):
     return query
 
 def upload_file(Vars):
-    tmp_dir="/storage/www/cpdnboinc_alpha/tmp_ancil_upload/"
+    tmp_dir="/storage/www/cpdnboinc_"+site+"/tmp_ancil_upload/"
     if Vars.ancil_type!="fullpos_namelist":
     	ulfile_zip=zipfile.ZipFile(tmp_dir+Vars.ulfile)
     	ret=ulfile_zip.testzip()
     	assert(ret is None),"Bad zip file. First bad file in zip: %s" % ret
 
     print("Uploading file...")    
-    ancil_dir="/storage/www/cpdnboinc_alpha/oifs_ancil_files/"+Vars.ancil_type
+    ancil_dir="/storage/www/cpdnboinc_"+site+"/oifs_ancil_files/"+Vars.ancil_type
     md5_info=subprocess.check_output(['md5sum',tmp_dir+Vars.ulfile])
     md5sum=md5_info.split()[0]
    
     if Vars.ancil_type=="ifsdata":
 	adir=ancil_dir+"/"+Vars.sub_type
-	url = "http://alpha.cpdn.org/oifs_ancil_files/"+Vars.ancil_type+"/"+Vars.sub_type+"/"+Vars.ulfile
+	url = "http://"+site+".cpdn.org/oifs_ancil_files/"+Vars.ancil_type+"/"+Vars.sub_type+"/"+Vars.ulfile
     else:
 	adir=ancil_dir
-	url = "http://alpha.cpdn.orgc/oifs_ancil_files/"+Vars.ancil_type+"/"+Vars.ulfile
+	url = "http://"+site+".cpdn.org/oifs_ancil_files/"+Vars.ancil_type+"/"+Vars.ulfile
     query= 'insert into oifs_ancil_files (file_name, created_by, uploaded_by, description, ancil_type, ancil_sub_type, model_version_number, md5sum, url) '
     query=query+" values ('"+Vars.ulfile+"','"+Vars.created_by+"','"+Vars.uploaded_by+"','"+Vars.file_desc+"','"+Vars.ancil_type+"',"+Vars.sub_type+",'"+Vars.model_version+"','"+md5sum+"','"+url+"')"
     try:

@@ -40,7 +40,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
 // Settings
 //$targetDir = DIRECTORY_SEPARATOR . "tmp" . DIRECTORY_SEPARATOR . "plupload";
 //$targetDir = 'uploads';
-$targetDir = "/storage/www/cpdnboinc_alpha/tmp_ancil_upload";
+$targetDir = "/storage/www/cpdnboinc_dev/tmp_ancil_upload";
 $cleanupTargetDir = true; // Remove old files
 $maxFileAge = 5 * 3600; // Temp file age in seconds
 

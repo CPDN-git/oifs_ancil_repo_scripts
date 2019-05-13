@@ -59,8 +59,8 @@ echo '<hr>';
 $user = get_logged_in_user();
 
 $python_env='/home/boinc/miniconda2/envs/oifs_pyenv/bin/python';
-$script_path='/storage/www/cpdnboinc_alpha/oifs_ancil_repo_scripts/';
-$tmp_dir='/storage/www/cpdnboinc_alpha/tmp_ancil_upload/';
+$script_path='/storage/www/cpdnboinc_dev/oifs_ancil_repo_scripts/';
+$tmp_dir='/storage/www/cpdnboinc_dev/tmp_ancil_upload/';
 
 if (in_array($user->email_addr,$allowed_uploaders)){
         echo "$user->name is logged in<br>";
