@@ -226,7 +226,6 @@ def upload_file(Vars):
     query=query+" values ('"+Vars.ulfile+"','"+Vars.created_by+"','"+Vars.uploaded_by+"','"+Vars.file_desc+"','"+Vars.ancil_type+"','"+Vars.sub_type+"','"+Vars.model_version+"','"+md5sum+"','"+url+"')"
     try:
 	print("Adding "+Vars.ulfile+" to the database")
-	print(query)
 	cursor.execute(query)
 	print("Moving file into the repository...")
         shutil.move(tmp_dir+Vars.ulfile,adir)
