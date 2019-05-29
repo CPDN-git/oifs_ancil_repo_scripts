@@ -117,7 +117,7 @@ if (in_array($user->email_addr,$allowed_uploaders)){
 		<option value="ic_ancil">initial files (as .tgz)</option>
   		<option value="ifsdata">ifsdata (as .zip) </option>
  		<option value="climate_data">climate_data (as .zip)</option>
-		<option value="fullpos_namelist">FullPos namelist (as .fps)</option>
+		<option value="fullpos_namelist">FullPos namelist (as .nml)</option>
 		</select><br><br>
 	
 	<div id="subType" name="subType" style="display: none;">
@@ -173,7 +173,7 @@ var uploader = new plupload.Uploader({
 
         mime_types: [
             {title : "Zip files", extensions : "zip,tgz"},
-	    {title : "Namelist files", extensions : "fps"}
+	    {title : "Namelist files", extensions : "nml"}
         ]
     },
  

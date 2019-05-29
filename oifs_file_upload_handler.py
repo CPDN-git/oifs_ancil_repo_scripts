@@ -223,9 +223,10 @@ def upload_file(Vars):
 	adir=ancil_dir
 	url = "http://"+site+".cpdn.org/oifs_ancil_files/"+Vars.ancil_type+"/"+Vars.ulfile
     query= 'insert into oifs_ancil_files (file_name, created_by, uploaded_by, description, ancil_type, ancil_sub_type, model_version_number, md5sum, url) '
-    query=query+" values ('"+Vars.ulfile+"','"+Vars.created_by+"','"+Vars.uploaded_by+"','"+Vars.file_desc+"','"+Vars.ancil_type+"',"+Vars.sub_type+",'"+Vars.model_version+"','"+md5sum+"','"+url+"')"
+    query=query+" values ('"+Vars.ulfile+"','"+Vars.created_by+"','"+Vars.uploaded_by+"','"+Vars.file_desc+"','"+Vars.ancil_type+"','"+Vars.sub_type+"','"+Vars.model_version+"','"+md5sum+"','"+url+"')"
     try:
 	print("Adding "+Vars.ulfile+" to the database")
+	print(query)
 	cursor.execute(query)
 	print("Moving file into the repository...")
         shutil.move(tmp_dir+Vars.ulfile,adir)

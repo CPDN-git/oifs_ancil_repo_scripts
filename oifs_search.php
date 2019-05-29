@@ -54,8 +54,19 @@ echo '<hr>';
       <tr>
         <td><label>File Name:<br></label><input type="text" name="by_name" /></td>
         <td><label>Case Study/Description:<br></label><input type="text" name="by_desc" /></td>
-	<td><label>Type:<br></label><input type="text" name="by_type" /></td>
-	<td><label>Sub type:<br></label><input type="text" name="by_subtype" /></td>
+	<td><label>Type:<br></label><select name="by_type">
+                <option value="">Select...</option>
+                <option value="ic_ancil">initial files</option>
+                <option value="ifsdata">ifsdata</option>
+                <option value="climate_data">climate_data</option>
+                <option value="fullpos_namelist">FullPos namelist</option>
+                </select></td>
+	<td><label>Sub type:<br></label><select name="by_subtype">
+                <option value="">Select...</option>
+                <option value="CFC_files">CFC files</option>
+                <option value="radiation_files">Radiation files</option>
+                <option value="SO4 files">SO4 files</option>
+                </select></td>
         <td><label>Start Date:<br></label><input type="text" name="by_start" /></td>
         <td><label>ECMWF exptid:<br></label><input type="text" name="by_exptid" /></td>
         <td><input class="button" type="submit" name="submit" value="Search" /></td>
@@ -98,7 +109,6 @@ if(isset($_POST['submit'])) {
     if (count($conditions) > 0) {
       $sql .= " WHERE " . implode(' AND ', $conditions);
     }
-
     $tablesorter_class='cpdnTable';
 
     $link = mysqli_connect($host,$user,$pass,$dbname) or die("Error " . mysqli_error($link));
