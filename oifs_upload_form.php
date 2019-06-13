@@ -169,7 +169,7 @@ var uploader = new plupload.Uploader({
     chunk_size : '10mb',
 
     filters : {
-        max_file_size : '2gb',
+        max_file_size : '5gb',
 
         mime_types: [
             {title : "Zip files", extensions : "zip,tgz"},
