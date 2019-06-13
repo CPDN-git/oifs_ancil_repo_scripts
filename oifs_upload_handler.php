@@ -91,8 +91,7 @@ if (in_array($user->email_addr,$allowed_uploaders)){
         echo '<p style=color:green;>md5 checksum: '.$md5_value.'</p>';
 
 	$r = escapeshellcmd( $python_env.' '.$script_path.'oifs_file_upload_handler.py "'.$_POST['created_by'].'"  "'.$user->name.'" "'.$_POST['model_version'].'" "'.$_POST['starting_analysis'].'" "'.$_POST['ancil_type'].'" "'.$_POST['sub_type'].'" "'.$_POST['file_desc'].'" "'.$fileName.'"');
-
-	$output = shell_exec($r);
+	$output = shell_exec($r.' 2>&1');
 	echo "<pre>$output</pre>";
 }
 else {

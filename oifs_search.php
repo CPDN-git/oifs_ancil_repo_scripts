@@ -51,7 +51,7 @@ echo '<hr>';
 ?>
     <form action="" method="post">
     <table width="100%" border="0" style="border:none;">
-      <tr>
+      <tr class=nohover>
         <td><label>File Name:<br></label><input type="text" name="by_name" /></td>
         <td><label>Case Study/Description:<br></label><input type="text" name="by_desc" /></td>
 	<td><label>Type:<br></label><select name="by_type">
