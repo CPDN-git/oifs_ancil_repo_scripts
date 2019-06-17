@@ -140,7 +140,7 @@ def get_grib_info(exptid,analysis_no,ddir):
     ICMSH_lines=info.split("\n")
     ICMSH_line=ICMSH_lines[2].split()
     
-    analysis_num=ICMSH_line[0].zfill(2)
+    analysis_num=ICMSH_line[0].zfill(3)
     # Check analysis number consistent with the file name
     #assert (analysis_num==analysis_no),"Analysis perturbation number (%s) is inconsistent with ICMSH grib file (%s)" %(analysis_no,analysis_num) 
 
