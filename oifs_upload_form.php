@@ -166,7 +166,7 @@ var uploader = new plupload.Uploader({
     container: document.getElementById('container'), // ... or DOM Element itself
   //  multi_selection: false,     
     url : "../plupload_handler.php",
-    chunk_size : '10mb',
+    chunk_size : '100mb',
 
     filters : {
         max_file_size : '5gb',
