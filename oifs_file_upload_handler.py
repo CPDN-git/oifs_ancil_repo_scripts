@@ -191,13 +191,13 @@ def get_hour(time):
 
 def get_query(Vars,GribInfo,fname,md5sum):
     if Vars.sub_type!="0":
-	url = "http://"+site+".cpdn.org/cpdn_ancil_files/oifs_ancil_files/"+Vars.ancil_type+"/"+Vars.sub_type+"/"+fname
+	url = "http://"+site+".cpdn.org/oifs_ancil_files/"+Vars.ancil_type+"/"+Vars.sub_type+"/"+fname
     else:
         if Vars.ancil_type=="ic_ancil":
             expt_path=GribInfo['exptid']+"/"+GribInfo['start_date']+"/"+GribInfo['analysis_number']+"/"+fname
-            url = "http://"+site+".cpdn.org/cpdn_ancil_files/oifs_ancil_files/"+Vars.ancil_type+"/"+expt_path
+            url = "http://"+site+".cpdn.org/oifs_ancil_files/"+Vars.ancil_type+"/"+expt_path
         else:
-            url = "http://"+site+".cpdn.org/cpdn_ancil_files/oifs_ancil_files/"+Vars.ancil_type+"/"+fname
+            url = "http://"+site+".cpdn.org/oifs_ancil_files/"+Vars.ancil_type+"/"+fname
 
     query= 'insert into oifs_ancil_files (file_name, created_by, uploaded_by, description, ancil_type, ancil_sub_type, model_version_number, exptid, starting_analysis, analysis_perturbation_number, start_date, end_date, spectral_horizontal_resolution, gridpoint_horizontal_resolution, vertical_resolution, md5sum, url) '
     query=query+" values ('"+fname+"','"+Vars.created_by+"','"+Vars.uploaded_by+"','"+Vars.file_desc+"','"+Vars.ancil_type+"',"+Vars.sub_type+",'"+Vars.model_version+"','"+GribInfo['exptid']+"','"+Vars.starting_analysis+"','"+GribInfo['analysis_number']+"','"+GribInfo['start_date']+"','"+GribInfo['end_date']+"','"+GribInfo['spectral_horizontal_resolution']+"','"+GribInfo['gridpoint_horizontal_resolution']+"','"+GribInfo['vertical_resolution']+"','"+md5sum+"','"+url+"')"
@@ -218,10 +218,10 @@ def upload_file(Vars):
    
     if Vars.ancil_type=="ifsdata":
 	adir=ancil_dir+"/"+Vars.sub_type
-	url = "http://"+site+".cpdn.org/cpdn_ancil_files/oifs_ancil_files/"+Vars.ancil_type+"/"+Vars.sub_type+"/"+Vars.ulfile
+	url = "http://"+site+".cpdn.org/oifs_ancil_files/"+Vars.ancil_type+"/"+Vars.sub_type+"/"+Vars.ulfile
     else:
 	adir=ancil_dir
-	url = "http://"+site+".cpdn.org/cpdn_ancil_files/oifs_ancil_files/"+Vars.ancil_type+"/"+Vars.ulfile
+	url = "http://"+site+".cpdn.org/oifs_ancil_files/"+Vars.ancil_type+"/"+Vars.ulfile
     query= 'insert into oifs_ancil_files (file_name, created_by, uploaded_by, description, ancil_type, ancil_sub_type, model_version_number, md5sum, url) '
     query=query+" values ('"+Vars.ulfile+"','"+Vars.created_by+"','"+Vars.uploaded_by+"','"+Vars.file_desc+"','"+Vars.ancil_type+"','"+Vars.sub_type+"','"+Vars.model_version+"','"+md5sum+"','"+url+"')"
     try:
