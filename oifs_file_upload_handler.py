@@ -27,7 +27,7 @@ cursor = db.cursor(MySQLdb.cursors.DictCursor)
 def unpack_upload_file(Args):
     dates=[]
     tmp_dir="/storage/www/cpdnboinc_"+site+"/tmp_ancil_upload/"
-    ancil_dir="/storage/www/cpdnboinc_"+site+"/cpdn_ancil_files/oifs_ancil_files/"+Args.ancil_type
+    ancil_dir="/storage/cpdn_ancil_files/oifs_ancil_files/"+Args.ancil_type
     print("Extracting tarfile "+Args.ulfile+" to "+tmp_dir)
     tar= tarfile.open(tmp_dir+Args.ulfile)
     tar.extractall(path=tmp_dir)
@@ -212,7 +212,7 @@ def upload_file(Vars):
     	assert(ret is None),"Bad zip file. First bad file in zip: %s" % ret
 
     print("Uploading file...")    
-    ancil_dir="/storage/www/cpdnboinc_"+site+"/cpdn_ancil_files/oifs_ancil_files/"+Vars.ancil_type
+    ancil_dir="/storage/cpdn_ancil_files/oifs_ancil_files/"+Vars.ancil_type
     md5_info=subprocess.check_output(['md5sum',tmp_dir+Vars.ulfile])
     md5sum=md5_info.split()[0]
    
