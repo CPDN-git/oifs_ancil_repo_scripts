@@ -17,10 +17,10 @@ site='dev'
 # setup database connection
 db_config='/storage/www/cpdnboinc_'+site+'/ancil_batch_user_config.xml'
 tree=ET.parse(db_config)
-db_host=tree.find('db_host').text
-db_user=tree.find('db_user').text
-db_passwd=tree.find('db_passwd').text
-db_name=tree.find('db_name').text
+db_host=tree.find('ancil_db_host').text
+db_user=tree.find('ancil_user').text
+db_passwd=tree.find('ancil_passwd').text
+db_name=tree.find('ancil_db_name').text
 db = MySQLdb.connect(db_host,db_user,db_passwd,db_name,33001)
 cursor = db.cursor(MySQLdb.cursors.DictCursor)
 

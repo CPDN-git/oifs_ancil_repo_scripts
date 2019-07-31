@@ -35,10 +35,10 @@ echo '</div>';
 echo '<hr>';
 
 $xml=simplexml_load_file("/storage/www/cpdnboinc_dev/ancil_batch_user_config.xml") or die("Error: Cannot create object");
-$host= $xml->db_host;
-$dbname=$xml->db_name;
-$user= $xml->db_user;
-$pass= $xml->db_passwd;
+$host= $xml->ancil_db_host;
+$dbname=$xml->ancil_db_name;
+$user= $xml->ancil_user;
+$pass= $xml->ancil_passwd;
 
 $table=$dbname.'.oifs_ancil_files';
 $file_name = get_str("file_name");

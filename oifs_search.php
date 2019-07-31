@@ -1,11 +1,11 @@
 <?php
 $project_path="/storage/www/cpdnboinc_dev/";
 $xml=simplexml_load_file($project_path."ancil_batch_user_config.xml") or die("Error: Cannot create object");
-$host= $xml->db_host;
-$dbname=$xml->db_name;
-$boinc_dbname=$xml->boinc_db_name;
-$user= $xml->db_user;
-$pass= $xml->db_passwd;
+$host= $xml->ancil_db_host;
+$dbname=$xml->ancil_db_name;
+$boinc_dbname=$xml->ancil_boinc_db_name;
+$user= $xml->ancil_user;
+$pass= $xml->ancil_passwd;
 
 # include the table tag generatora 
 require_once('includes/html_table.class.php');
