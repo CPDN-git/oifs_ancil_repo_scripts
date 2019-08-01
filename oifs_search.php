@@ -41,7 +41,7 @@ EOH;
 echo '<div class="wrap" style="width:100%">';
 echo '<div style="width:100%">';
 echo '<img src="img/OIFS_Home_logo.png" alt="OpenIFS@home" style="width:200px">';
-echo '<img src="img/CPDN_logo_abbrv_sq.png" alt="CPDN" style="width:90px; float:right;">';
+echo '<img src="img/CPDN_abbrv_logo.png" alt="CPDN" style="width:250px; float:right;">';
 echo '</div>';
 echo '<div style="clear: both;"></div>';
 echo '</div>';
