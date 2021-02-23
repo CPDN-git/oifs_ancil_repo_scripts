@@ -21,7 +21,7 @@ db_host=tree.find('ancil_db_host').text
 db_user=tree.find('ancil_user').text
 db_passwd=tree.find('ancil_passwd').text
 db_name=tree.find('ancil_db_name').text
-db = MySQLdb.connect(db_host,db_user,db_passwd,db_name,33001)
+db = MySQLdb.connect(db_host,db_user,db_passwd,db_name)
 cursor = db.cursor(MySQLdb.cursors.DictCursor)
 
 def unpack_upload_file(Args):
@@ -32,8 +32,7 @@ def unpack_upload_file(Args):
     tar= tarfile.open(tmp_dir+Args.ulfile)
     tar.extractall(path=tmp_dir)
     tar.close()
-    exptid=Args.ulfile.split('.')[0].split('_')[0]
-    rootDir=tmp_dir+exptid
+    rootDir=tmp_dir+Args.exptid
 
     # Walk the untarred file and create zips.
     for dirName, subdirList, fileList in os.walk(rootDir, topdown=True):             
@@ -47,9 +46,9 @@ def unpack_upload_file(Args):
                         shutil.rmtree(dirName+'/ecmwf')
             if analysis_nos==[]:
                 analysis_no='00'
-                zipname="ic_"+exptid+"_"+date+"_"+analysis_no
-		adir=ancil_dir+"/"+exptid+"/"+date+"/"+analysis_no+"/"
-		grib_info=get_grib_info(exptid,analysis_no,dirName)
+                zipname="ic_"+Args.exptid+"_"+date+"_"+analysis_no
+		adir=ancil_dir+"/"+Args.exptid+"/"+date+"/"+analysis_no+"/"
+		grib_info=get_grib_info(Args.exptid,analysis_no,dirName)
                 if not os.path.exists(adir):
                         os.makedirs(adir)
 		print("Making zipfile "+zipname)
@@ -70,9 +69,9 @@ def unpack_upload_file(Args):
 
             else:
                 for analysis_no in analysis_nos:
-                    zipname="ic_"+exptid+"_"+date+"_"+analysis_no
-		    adir=ancil_dir+"/"+exptid+"/"+date+"/"+analysis_no+"/"
-                    grib_info=get_grib_info(exptid,analysis_no,dirName+"/"+analysis_no)
+                    zipname="ic_"+Args.exptid+"_"+date+"_"+analysis_no
+		    adir=ancil_dir+"/"+Args.exptid+"/"+date+"/"+analysis_no+"/"
+                    grib_info=get_grib_info(Args.exptid,analysis_no,dirName+"/"+analysis_no)
 		    if not os.path.exists(adir):
                         os.makedirs(adir)
 		    print("Making zipfile "+zipname)
@@ -94,7 +93,7 @@ def unpack_upload_file(Args):
     # Cleaning up tmp_dir
     print("Cleaning up")
     os.remove(tmp_dir+Args.ulfile)
-    shutil.rmtree(tmp_dir+exptid)
+    shutil.rmtree(tmp_dir+Args.exptid)
 
 def consistency_check(ic_files,exptid,ddir):
      print("Performing consistency check")
@@ -243,6 +242,7 @@ def main():
     parser.add_argument("created_by", help="The person who created the file")
     parser.add_argument("uploaded_by", help="The persion who uploaded the file")
     parser.add_argument("model_version", help="The model version number")
+    parser.add_argument("exptid", help="The ECMWF experiment id")
     parser.add_argument("starting_analysis", help="The model starting analysis")
     parser.add_argument("ancil_type", help="The ancillary file type")
     parser.add_argument("sub_type", help="The ancillary file sub-type")

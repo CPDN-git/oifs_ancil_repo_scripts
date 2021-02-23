@@ -131,6 +131,7 @@ if (in_array($user->email_addr,$allowed_uploaders)){
 	
 	<div id="ic_ancil_descriptions" name="ic_ancil_descriptions" style="display: none;">
 	<p>Note initial files are uploaded as a .tgz file with the directory structure [exptid]/[start date time]/[analysis perturbation number]/[files].<br>Multiple dates and analysis numbers can be included in a single upload tarball.  The analysis perturbation number directory can be ommited if only one exists.</p>
+	ECMWF experiment id: <input type="text" name="exptid" maxlength="4" size="4">
 	Starting analysis: <select id="starting_analysis" name="starting_analysis" class="dropdown">
                 <option value="0">Select</option>
                 <option value="Operational">Operational</option>
