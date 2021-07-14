@@ -64,7 +64,7 @@ $tmp_dir='/storage/www/cpdnboinc_dev/tmp_ancil_upload/';
 
 if (in_array($user->email_addr,$allowed_uploaders)){
         echo "$user->name is logged in<br>";
-	echo 'Created by '.$_POST["created_by"].'<br>';
+    echo 'Created by '.$_POST["created_by"].'<br>';
         echo 'Form was submitted, here are the form values: <pre>';
         print_r($_POST);
         echo "</pre>";
@@ -84,15 +84,18 @@ if (in_array($user->email_addr,$allowed_uploaders)){
                 $upload_ok=FALSE;
                 die("Error, Please make sure all information is entered.<br>");
         }
-	$fileName=$_POST['fileName'];
-	
-	echo '<p>Uploaded file: '.$fileName.'</p>';
-	$md5_value=md5_file($tmp_dir.$fileName);
-        echo '<p style=color:green;>md5 checksum: '.$md5_value.'</p>';
+    $fileName=$_POST['fileName'];
+    
+    echo '<p>Uploaded file: '.$fileName.'</p>';
+    $md5_value=md5_file($tmp_dir.$fileName);
+    echo '<p style=color:green;>md5 checksum: '.$md5_value.'</p>';
+    
+    $model_ver=$_POST['model_version'];
+    $grid_hres=$_POST['grid_hres_'.$model_ver];
 
-	$r = escapeshellcmd( $python_env.' '.$script_path.'oifs_file_upload_handler.py "'.$_POST['created_by'].'"  "'.$user->name.'" "'.$_POST['model_version'].'" "'.$_POST['exptid'].'" "'.$_POST['starting_analysis'].'" "'.$_POST['ancil_type'].'" "'.$_POST['sub_type'].'" "'.$_POST['file_desc'].'" "'.$fileName.'"');
-	$output = shell_exec($r.' 2>&1');
-	echo "<pre>$output</pre>";
+    $r = escapeshellcmd( $python_env.' '.$script_path.'oifs_file_upload_handler.py "'.$_POST['created_by'].'"  "'.$user->name.'" "'.$_POST['model_version'].'" "'.$_POST['exptid'].'" "'.$_POST['starting_analysis'].'" "'.$_POST['ancil_type'].'" "'.$_POST['sub_type'].'" "'.$grid_hres.'" "'.$_POST['file_desc'].'" "'.$fileName.'"');
+    $output = shell_exec($r.' 2>&1');
+    echo "<pre>$output</pre>";
 }
 else {
         die("You are not allowed to visit this page");

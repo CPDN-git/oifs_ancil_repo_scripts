@@ -54,18 +54,18 @@ echo '<hr>';
       <tr class=nohover>
         <td><label>File Name:<br></label><input type="text" name="by_name" /></td>
         <td><label>Case Study/Description:<br></label><input type="text" name="by_desc" /></td>
-	<td><label>Type:<br></label><select name="by_type">
+	    <td><label>Type:<br></label><select name="by_type">
                 <option value="">Select...</option>
                 <option value="ic_ancil">initial files</option>
                 <option value="ifsdata">ifsdata</option>
                 <option value="climate_data">climate_data</option>
                 <option value="fullpos_namelist">FullPos namelist</option>
                 </select></td>
-	<td><label>Sub type:<br></label><select name="by_subtype">
+	    <td><label>Sub type:<br></label><select name="by_subtype">
                 <option value="">Select...</option>
-                <option value="CFC_files">CFC files</option>
-                <option value="radiation_files">Radiation files</option>
-                <option value="SO4 files">SO4 files</option>
+                <option value="GHG_files">GHG files</option>
+                <option value="other_radiation_files">Other radiation files</option>
+                <option value="SO4_files">SO4 files</option>
                 </select></td>
         <td><label>Start Date:<br></label><input type="text" name="by_start" /></td>
         <td><label>ECMWF exptid:<br></label><input type="text" name="by_exptid" /></td>
@@ -84,7 +84,7 @@ if(isset($_POST['submit'])) {
     $by_exptid = $_POST['by_exptid'];
     //Do real escaping here
 
-    $query = "SELECT CONCAT('<a href=http://dev.cpdn.org/oifs_ancil_details.php?file_name=',file_name,'>',file_name,'</a>') as 'File name', date(create_time) as 'Creation date', created_by as 'Created by', description as 'Description', ancil_type as 'Type', IF(STRCMP(ancil_sub_type,'0') = 0,'',ancil_sub_type) as 'Sub type', model_version_number as 'Model version', exptid as 'Exptid', starting_analysis as 'Starting analysis', analysis_perturbation_number as 'Analysis number', start_date as 'Start date', end_date as 'End date', CONCAT(spectral_horizontal_resolution,gridpoint_horizontal_resolution) as 'Horizontal resolution', vertical_resolution as 'Vertical resolution', batches_used as 'Batches used'  FROM ".$dbname.".oifs_ancil_files";
+    $query = "SELECT CONCAT('<a href=http://dev.cpdn.org/oifs_ancil_details.php?file_name=',file_name,'>',file_name,'</a>') as 'File name', date(create_time) as 'Creation date', created_by as 'Created by', description as 'Description', ancil_type as 'Type', IF(STRCMP(ancil_sub_type,'0') = 0,'',ancil_sub_type) as 'Sub type', model_version_number as 'Model version', exptid as 'Exptid', starting_analysis as 'Starting analysis', analysis_perturbation_number as 'Analysis number', start_date as 'Start date', end_date as 'End date', CONCAT(COALESCE(grid_type,''),COALESCE(spectral_horizontal_resolution,''),COALESCE(gridpoint_horizontal_resolution,'')) as 'Horizontal resolution', vertical_resolution as 'Vertical resolution', batches_used as 'Batches used'  FROM ".$dbname.".oifs_ancil_files";
     $conditions = array();
 
     if(! empty($by_name)) {

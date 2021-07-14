@@ -11,6 +11,7 @@ import xml.etree.ElementTree as ET
 import tarfile
 import subprocess
 import zipfile
+import re
 
 site='dev'
 
@@ -41,46 +42,46 @@ def unpack_upload_file(Args):
         date=dirName.split('/')[-1]
         if date in dates:
             analysis_nos=[i for i in subdirList if i != 'ecmwf']
-	    if 'ecmwf' in subdirList:
-                        print("Removing ecmwf directory...")
-                        shutil.rmtree(dirName+'/ecmwf')
+            if 'ecmwf' in subdirList:
+                print("Removing ecmwf directory...")
+                shutil.rmtree(dirName+'/ecmwf')
             if analysis_nos==[]:
                 analysis_no='00'
                 zipname="ic_"+Args.exptid+"_"+date+"_"+analysis_no
-		adir=ancil_dir+"/"+Args.exptid+"/"+date+"/"+analysis_no+"/"
-		grib_info=get_grib_info(Args.exptid,analysis_no,dirName)
+                adir=ancil_dir+"/"+Args.exptid+"/"+date+"/"+analysis_no+"/"
+                grib_info=get_grib_info(Args.exptid,analysis_no,dirName)
                 if not os.path.exists(adir):
-                        os.makedirs(adir)
-		print("Making zipfile "+zipname)
-		shutil.make_archive(adir+zipname,"zip",dirName)
-	
-		md5_info=subprocess.check_output(['md5sum',adir+zipname+'.zip']) 
-		md5sum=md5_info.split()[0]
-		query=get_query(Args,grib_info,zipname+'.zip',md5sum)
-		try:
-			print("Adding "+zipname+".zip to the database")
-			cursor.execute(query)
-		        db.commit()
-		except Exception,e:
-			print 'Error adding file:',zipname+".zip",e
-        		db.rollback()
-			os.remove(adir+zipname+'.zip')
-			continue
+                    os.makedirs(adir)
+                print("Making zipfile "+zipname)
+                shutil.make_archive(adir+zipname,"zip",dirName)
+    
+                md5_info=subprocess.check_output(['md5sum',adir+zipname+'.zip']) 
+                md5sum=md5_info.split()[0]
+                query=get_query(Args,grib_info,zipname+'.zip',md5sum)
+                try:
+                    print("Adding "+zipname+".zip to the database")
+                    cursor.execute(query)
+                    db.commit()
+                except Exception,e:
+                    print 'Error adding file:',zipname+".zip",e
+                    db.rollback()
+                    os.remove(adir+zipname+'.zip')
+                    continue
 
             else:
                 for analysis_no in analysis_nos:
                     zipname="ic_"+Args.exptid+"_"+date+"_"+analysis_no
-		    adir=ancil_dir+"/"+Args.exptid+"/"+date+"/"+analysis_no+"/"
+                    adir=ancil_dir+"/"+Args.exptid+"/"+date+"/"+analysis_no+"/"
                     grib_info=get_grib_info(Args.exptid,analysis_no,dirName+"/"+analysis_no)
-		    if not os.path.exists(adir):
+                    if not os.path.exists(adir):
                         os.makedirs(adir)
-		    print("Making zipfile "+zipname)
-		    shutil.make_archive(adir+zipname,"zip",dirName+"/"+analysis_no)
-	
-		    md5_info=subprocess.check_output(['md5sum',adir+zipname+'.zip'])
+                    print("Making zipfile "+zipname)
+                    shutil.make_archive(adir+zipname,"zip",dirName+"/"+analysis_no)
+    
+                    md5_info=subprocess.check_output(['md5sum',adir+zipname+'.zip'])
                     md5sum=md5_info.split()[0]
                     query=get_query(Args,grib_info,zipname+'.zip',md5sum)
-    		    try:
+                    try:
                         print("Adding "+zipname+".zip to the database")
                         cursor.execute(query)
                         db.commit()
@@ -96,29 +97,29 @@ def unpack_upload_file(Args):
     shutil.rmtree(tmp_dir+Args.exptid)
 
 def consistency_check(ic_files,exptid,ddir):
-     print("Performing consistency check")
-     expts=[]
-     start_dates=[]
-     for ic_file in ic_files:
-	print("Checking %s file" %ic_file)
-	info=subprocess.check_output(["/home/boinc/eccodes/bin/grib_ls","-w", "count=1", "-p", "experimentVersionNumber,dataDate,dataTime",ddir+"/"+ic_file])
-	lines=info.split("\n")
-	line=lines[2].split()
-	#Bypass exptid check for ICMCL file as fields can have climatologies with exptid of "0001" and be valid.
-	#if ic_file != ic_files[-1]:
-	expts.append(line[0])
-	hour=get_hour(line[-1])
-	start_date=line[1]+hour
-	start_dates.append(start_date)
+    print("Performing consistency check")
+    expts=[]
+    start_dates=[]
+    for ic_file in ic_files:
+        print("Checking %s file" %ic_file)
+        info=subprocess.check_output(["/home/boinc/eccodes/bin/grib_ls","-w", "count=1", "-p", "experimentVersionNumber,dataDate,dataTime",ddir+"/"+ic_file])
+        lines=info.split("\n")
+        line=lines[2].split()
+        #Bypass exptid check for ICMCL file as fields can have climatologies with exptid of "0001" and be valid.
+        #if ic_file != ic_files[-1]:
+        expts.append(line[0])
+        hour=get_hour(line[-1])
+        start_date=line[1]+hour
+        start_dates.append(start_date)
     # print("Experiment IDs: ",set(expts))
-     assert(len(set(expts))==1),"Inconsistent experiment IDs in initial files"
-     assert(expts[0]==exptid),"Experiment ID (%s) is inconsistent with grib files (%s)" %(exptid,expts[0])
+    assert(len(set(expts))==1),"Inconsistent experiment IDs in initial files"
+    assert(expts[0]==exptid),"Experiment ID (%s) is inconsistent with grib files (%s)" %(exptid,expts[0])
      
     # print("Start dates: ",set(start_dates))
-     assert(len(set(start_dates))==1),"Inconsistent start dates in initial files"
+    assert(len(set(start_dates))==1),"Inconsistent start dates in initial files"
      
-     return start_dates[0]
-	
+    return start_dates[0]
+    
 def get_grib_info(exptid,analysis_no,ddir):
     file_info={}
     ICMSH_file="ICMSH"+exptid+"INIT"
@@ -143,7 +144,7 @@ def get_grib_info(exptid,analysis_no,ddir):
     # Check analysis number consistent with the file name
     #assert (analysis_num==analysis_no),"Analysis perturbation number (%s) is inconsistent with ICMSH grib file (%s)" %(analysis_no,analysis_num) 
 
-    ICMSH_hres="T"+ICMSH_line[-1]
+    ICMSH_hres=ICMSH_line[-1]
     file_info["spectral_horizontal_resolution"]=ICMSH_hres
 
     # Get the end date from the ICMCL file
@@ -161,11 +162,21 @@ def get_grib_info(exptid,analysis_no,ddir):
     ICMSH_line=ICMSH_lines[-2].split()
     file_info["vertical_resolution"]="L"+ICMSH_line[-1]
 
+
     # Get the grid point horizonal resolution
-    info=subprocess.check_output(["/home/boinc/eccodes/bin/grib_ls","-w", "count=1", "-p", "N",ddir+"/"+ICMGG_file])
+    info=subprocess.check_output(["/home/boinc/eccodes/bin/grib_ls","-w", "count=1", "-p", "N,is_octahedral",ddir+"/"+ICMGG_file])
     ICMGG_lines=info.split("\n")
     ICMGG_line=ICMGG_lines[2].split()
     ICMGG_hres="N"+ICMGG_line[0]
+
+    # Get the grid type information
+    if ICMGG_line[-1]=="0":
+        ICMGG_grid="Tl"
+    elif ICMGG_line[-1]=="1":
+        ICMGG_grid="Tco"
+    else:
+        ICMGG_grid=""
+    file_info["grid_type"]=ICMGG_grid
 
     # Get the grid point horizonal resolution
     info=subprocess.check_output(["/home/boinc/eccodes/bin/grib_ls","-w", "count=1", "-p", "N",ddir+"/"+ICMGGUA_file])
@@ -180,17 +191,17 @@ def get_grib_info(exptid,analysis_no,ddir):
 
 def get_hour(time):
     if len(time)==1:
-	hour=time.zfill(2)
+        hour=time.zfill(2)
     if len(time)==3:
-	hour=time[0].zfill(2)
+        hour=time[0].zfill(2)
     if len(time)==4:
-	hour=time[0:2]
+        hour=time[0:2]
     #print("Extracting hour "+hour+" from time "+time)
     return hour 
 
 def get_query(Vars,GribInfo,fname,md5sum):
     if Vars.sub_type!="0":
-	url = "http://"+site+".cpdn.org/oifs_ancil_files/"+Vars.ancil_type+"/"+Vars.sub_type+"/"+fname
+        url = "http://"+site+".cpdn.org/oifs_ancil_files/"+Vars.ancil_type+"/"+Vars.sub_type+"/"+fname
     else:
         if Vars.ancil_type=="ic_ancil":
             expt_path=GribInfo['exptid']+"/"+GribInfo['start_date']+"/"+GribInfo['analysis_number']+"/"+fname
@@ -198,35 +209,37 @@ def get_query(Vars,GribInfo,fname,md5sum):
         else:
             url = "http://"+site+".cpdn.org/oifs_ancil_files/"+Vars.ancil_type+"/"+fname
 
-    query= 'insert into oifs_ancil_files (file_name, created_by, uploaded_by, description, ancil_type, ancil_sub_type, model_version_number, exptid, starting_analysis, analysis_perturbation_number, start_date, end_date, spectral_horizontal_resolution, gridpoint_horizontal_resolution, vertical_resolution, md5sum, url) '
-    query=query+" values ('"+fname+"','"+Vars.created_by+"','"+Vars.uploaded_by+"','"+Vars.file_desc+"','"+Vars.ancil_type+"',"+Vars.sub_type+",'"+Vars.model_version+"','"+GribInfo['exptid']+"','"+Vars.starting_analysis+"','"+GribInfo['analysis_number']+"','"+GribInfo['start_date']+"','"+GribInfo['end_date']+"','"+GribInfo['spectral_horizontal_resolution']+"','"+GribInfo['gridpoint_horizontal_resolution']+"','"+GribInfo['vertical_resolution']+"','"+md5sum+"','"+url+"')"
+    query= 'insert into oifs_ancil_files (file_name, created_by, uploaded_by, description, ancil_type, ancil_sub_type, model_version_number, exptid, starting_analysis, analysis_perturbation_number, start_date, end_date, grid_type, spectral_horizontal_resolution, gridpoint_horizontal_resolution, vertical_resolution, md5sum, url) '
+    query=query+" values ('"+fname+"','"+Vars.created_by+"','"+Vars.uploaded_by+"','"+Vars.file_desc+"','"+Vars.ancil_type+"',"+Vars.sub_type+",'"+Vars.model_version+"','"+GribInfo['exptid']+"','"+Vars.starting_analysis+"','"+GribInfo['analysis_number']+"','"+GribInfo['start_date']+"','"+GribInfo['end_date']+"','"+GribInfo['grid_type']+"','"+GribInfo['spectral_horizontal_resolution']+"','"+GribInfo['gridpoint_horizontal_resolution']+"','"+GribInfo['vertical_resolution']+"','"+md5sum+"','"+url+"')"
 
     return query
 
 def upload_file(Vars):
     tmp_dir="/storage/www/cpdnboinc_"+site+"/tmp_ancil_upload/"
     if Vars.ancil_type!="fullpos_namelist":
-    	ulfile_zip=zipfile.ZipFile(tmp_dir+Vars.ulfile)
-    	ret=ulfile_zip.testzip()
-    	assert(ret is None),"Bad zip file. First bad file in zip: %s" % ret
+        ulfile_zip=zipfile.ZipFile(tmp_dir+Vars.ulfile)
+        ret=ulfile_zip.testzip()
+        assert(ret is None),"Bad zip file. First bad file in zip: %s" % ret
 
     print("Uploading file...")    
     ancil_dir="/storage/cpdn_ancil_files/oifs_ancil_files/"+Vars.ancil_type
     md5_info=subprocess.check_output(['md5sum',tmp_dir+Vars.ulfile])
     md5sum=md5_info.split()[0]
    
+    grid_hres_parts=re.split('(\d.*)',Vars.grid_hres)
+
     if Vars.ancil_type=="ifsdata":
-	adir=ancil_dir+"/"+Vars.sub_type
-	url = "http://"+site+".cpdn.org/oifs_ancil_files/"+Vars.ancil_type+"/"+Vars.sub_type+"/"+Vars.ulfile
+        adir=ancil_dir+"/"+Vars.sub_type
+        url = "http://"+site+".cpdn.org/oifs_ancil_files/"+Vars.ancil_type+"/"+Vars.sub_type+"/"+Vars.ulfile
     else:
-	adir=ancil_dir
-	url = "http://"+site+".cpdn.org/oifs_ancil_files/"+Vars.ancil_type+"/"+Vars.ulfile
-    query= 'insert into oifs_ancil_files (file_name, created_by, uploaded_by, description, ancil_type, ancil_sub_type, model_version_number, md5sum, url) '
-    query=query+" values ('"+Vars.ulfile+"','"+Vars.created_by+"','"+Vars.uploaded_by+"','"+Vars.file_desc+"','"+Vars.ancil_type+"','"+Vars.sub_type+"','"+Vars.model_version+"','"+md5sum+"','"+url+"')"
+        adir=ancil_dir
+        url = "http://"+site+".cpdn.org/oifs_ancil_files/"+Vars.ancil_type+"/"+Vars.ulfile
+    query= 'insert into oifs_ancil_files (file_name, created_by, uploaded_by, description, ancil_type, ancil_sub_type, model_version_number, grid_type, spectral_horizontal_resolution, md5sum, url) '
+    query=query+" values ('"+Vars.ulfile+"','"+Vars.created_by+"','"+Vars.uploaded_by+"','"+Vars.file_desc+"','"+Vars.ancil_type+"','"+Vars.sub_type+"','"+Vars.model_version+"','"+grid_hres_parts[0]+"','"+grid_hres_parts[1]+"','"+md5sum+"','"+url+"')"
     try:
-	print("Adding "+Vars.ulfile+" to the database")
-	cursor.execute(query)
-	print("Moving file into the repository...")
+        print("Adding "+Vars.ulfile+" to the database")
+        cursor.execute(query)
+        print("Moving file into the repository...")
         shutil.move(tmp_dir+Vars.ulfile,adir)
         db.commit()
     except Exception,e:
@@ -246,6 +259,7 @@ def main():
     parser.add_argument("starting_analysis", help="The model starting analysis")
     parser.add_argument("ancil_type", help="The ancillary file type")
     parser.add_argument("sub_type", help="The ancillary file sub-type")
+    parser.add_argument("grid_hres", help="The spectral horizontal resolution and grid information")
     parser.add_argument("file_desc", help="The file description")
     parser.add_argument("ulfile", help="The upload file")
     args = parser.parse_args()
@@ -253,7 +267,7 @@ def main():
     if args.ancil_type == "ic_ancil":
         unpack_upload_file(args)
     else:
-	upload_file(args)
+        upload_file(args)
 
     print('Finished!')
 
