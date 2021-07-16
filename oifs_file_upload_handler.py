@@ -25,6 +25,9 @@ db_name=tree.find('ancil_db_name').text
 db = MySQLdb.connect(db_host,db_user,db_passwd,db_name)
 cursor = db.cursor(MySQLdb.cursors.DictCursor)
 
+os.environ["GRIB_DEFINITION_PATH"] = "/home/boinc/eccodes/definitions"
+grib_dir="/home/boinc/eccodes/build/bin/"
+
 def unpack_upload_file(Args):
     dates=[]
     tmp_dir="/storage/www/cpdnboinc_"+site+"/tmp_ancil_upload/"
@@ -102,7 +105,7 @@ def consistency_check(ic_files,exptid,ddir):
     start_dates=[]
     for ic_file in ic_files:
         print("Checking %s file" %ic_file)
-        info=subprocess.check_output(["/home/boinc/eccodes/bin/grib_ls","-w", "count=1", "-p", "experimentVersionNumber,dataDate,dataTime",ddir+"/"+ic_file])
+        info=subprocess.check_output([grib_dir+"grib_ls","-w", "count=1", "-p", "experimentVersionNumber,dataDate,dataTime",ddir+"/"+ic_file])
         lines=info.split("\n")
         line=lines[2].split()
         #Bypass exptid check for ICMCL file as fields can have climatologies with exptid of "0001" and be valid.
@@ -136,7 +139,7 @@ def get_grib_info(exptid,analysis_no,ddir):
     file_info["exptid"]=exptid
     file_info["analysis_number"]=analysis_no
 
-    info=subprocess.check_output(["/home/boinc/eccodes/bin/grib_ls","-w", "count=1", "-p", "perturbationNumber,M",ddir+"/"+ICMSH_file])
+    info=subprocess.check_output([grib_dir+"grib_ls","-w", "count=1", "-p", "perturbationNumber,M",ddir+"/"+ICMSH_file])
     ICMSH_lines=info.split("\n")
     ICMSH_line=ICMSH_lines[2].split()
     
@@ -148,7 +151,7 @@ def get_grib_info(exptid,analysis_no,ddir):
     file_info["spectral_horizontal_resolution"]=ICMSH_hres
 
     # Get the end date from the ICMCL file
-    info=subprocess.check_output(["/home/boinc/eccodes/bin/grib_ls","-w", "shortName=stl1", "-p", "shortName,dataDate,dataTime",ddir+"/"+ICMCL_file])
+    info=subprocess.check_output([grib_dir+"grib_ls","-w", "shortName=stl1", "-p", "shortName,dataDate,dataTime",ddir+"/"+ICMCL_file])
     ICMCL_lines_data=info.split("messages")[0]
     ICMCL_lines=ICMCL_lines_data.split("\n")
     ICMCL_line=ICMCL_lines[-2].split()
@@ -156,7 +159,7 @@ def get_grib_info(exptid,analysis_no,ddir):
     file_info["end_date"]=ICMCL_line[1]+end_hour 
     
     # Get the vertical resolution from the ICMSH file
-    info=subprocess.check_output(["/home/boinc/eccodes/bin/grib_ls","-w", "shortName=vo", "-p", "shortName,level",ddir+"/"+ICMSH_file])
+    info=subprocess.check_output([grib_dir+"grib_ls","-w", "shortName=vo", "-p", "shortName,level",ddir+"/"+ICMSH_file])
     ICMSH_lines_data=info.split("messages")[0]
     ICMSH_lines=ICMSH_lines_data.split("\n")
     ICMSH_line=ICMSH_lines[-2].split()
@@ -164,27 +167,42 @@ def get_grib_info(exptid,analysis_no,ddir):
 
 
     # Get the grid point horizonal resolution
-    info=subprocess.check_output(["/home/boinc/eccodes/bin/grib_ls","-w", "count=1", "-p", "N,is_octahedral",ddir+"/"+ICMGG_file])
-    ICMGG_lines=info.split("\n")
-    ICMGG_line=ICMGG_lines[2].split()
-    ICMGG_hres="N"+ICMGG_line[0]
+    info=subprocess.check_output([grib_dir+"grib_ls","-w", "count=1", "-p", "N,isOctahedral",ddir+"/"+ICMGG_file])
+    ICMGG_lines_data=info.split("messages")[0]
+    ICMGG_lines=ICMGG_lines_data.split("\n")
+    ICMGG_line=ICMGG_lines[-2].split()
 
     # Get the grid type information
     if ICMGG_line[-1]=="0":
         ICMGG_grid="Tl"
+        ICMGG_hres="N"+ICMGG_line[0]
     elif ICMGG_line[-1]=="1":
         ICMGG_grid="Tco"
+        ICMGG_hres="O"+ICMGG_line[0]
     else:
         ICMGG_grid=""
+        ICMGG_hres=""
     file_info["grid_type"]=ICMGG_grid
 
     # Get the grid point horizonal resolution
-    info=subprocess.check_output(["/home/boinc/eccodes/bin/grib_ls","-w", "count=1", "-p", "N",ddir+"/"+ICMGGUA_file])
-    ICMGGUA_lines=info.split("\n")
-    ICMGGUA_line=ICMGGUA_lines[2].split()
-    ICMGGUA_hres="N"+ICMGGUA_line[0]
-    assert (ICMGGUA_hres==ICMGG_hres),"Horizontal resolution in ICMGG grib file (%s) is inconsistent with Upper Air ICMGG grib file (%s)" %(ICMGG_hres,ICMGGUA_hres)
+    info=subprocess.check_output([grib_dir+"grib_ls","-w", "count=1", "-p", "N,isOctahedral",ddir+"/"+ICMGGUA_file])
+    ICMGGUA_lines_data=info.split("messages")[0]
+    ICMGGUA_lines=ICMGGUA_lines_data.split("\n")
+    ICMGGUA_line=ICMGGUA_lines[-2].split()
 
+    # Get the grid type information
+    if ICMGGUA_line[-1]=="0":
+        ICMGGUA_grid="Tl"
+        ICMGGUA_hres="N"+ICMGGUA_line[0]
+    elif ICMGG_line[-1]=="1":
+        ICMGGUA_grid="Tco"
+        ICMGGUA_hres="O"+ICMGGUA_line[0]
+    else:
+        ICMGGUA_grid=""
+        ICMGGUA_hres=""
+
+    assert (ICMGGUA_hres==ICMGG_hres),"Horizontal resolution in ICMGG grib file (%s) is inconsistent with Upper Air ICMGG grib file (%s)" %(ICMGG_hres,ICMGGUA_hres)
+    
     file_info["gridpoint_horizontal_resolution"]=ICMGG_hres
 
     return file_info
