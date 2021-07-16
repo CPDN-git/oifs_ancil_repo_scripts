@@ -42,7 +42,7 @@ $pass= $xml->ancil_passwd;
 
 $table=$dbname.'.oifs_ancil_files';
 $file_name = get_str("file_name");
-$fields="file_name, create_time, created_by, description, ancil_type,  ancil_sub_type, model_version_number, exptid, starting_analysis, analysis_perturbation_number, start_date, end_date, spectral_horizontal_resolution, gridpoint_horizontal_resolution, vertical_resolution, batches_used, md5sum, url, status";
+$fields="file_name, create_time, created_by, description, ancil_type,  ancil_sub_type, model_version_number, exptid, starting_analysis, analysis_perturbation_number, start_date, end_date, grid_type,spectral_horizontal_resolution, gridpoint_horizontal_resolution, vertical_resolution, batches_used, md5sum, url, status";
 $link = mysqli_connect($host,$user,$pass,$dbname) or die("Error " . mysqli_error($link));
 $query = $link->prepare("SELECT $fields FROM $table where file_name=?") or die("Error " . mysqli_error($link));
 $query->bind_param('s',$file_name);
@@ -50,7 +50,7 @@ $query->execute();
 
 
 # Trying to use bind_result instead of get_result
-$query->bind_result($file_name, $create_time, $created_by, $description,  $ancil_type,  $ancil_sub_type, $model_version_number, $exptid, $starting_analysis, $analysis_perturbation_number, $start_date, $end_date, $spectral_horizontal_resolution, $gridpoint_horizontal_resolution, $vertical_resolution, $batches_used, $md5sum, $url, $status);
+$query->bind_result($file_name, $create_time, $created_by, $description,  $ancil_type,  $ancil_sub_type, $model_version_number, $exptid, $starting_analysis, $analysis_perturbation_number, $start_date, $end_date, $grid_type, $spectral_horizontal_resolution, $gridpoint_horizontal_resolution, $vertical_resolution, $batches_used, $md5sum, $url, $status);
 
 $query->store_result();
 
@@ -58,29 +58,30 @@ echo "<strong> Ancil File Details</strong> <br>";
 echo "<br>";
 
 while ($query->fetch()){
-	echo "<strong>Filename: </strong>".$file_name."<br>";
-	echo "<strong>Create time: </strong>".$create_time."<br>";
-	echo "<strong>Created by: </strong>".$created_by."<br>";
-	echo "<strong>Description: </strong>".$description."<br>";
-	echo "<strong>Ancil type: </strong>".$ancil_type."<br>";
-	echo "<strong>Ancil sub-type: </strong>".$ancil_sub_type."<br>";
-	echo "<strong>Model version number: </strong>".$model_version_number."<br>";
-	echo "<strong>ECMWF Experiment ID: </strong>".$exptid."<br>";
-	echo "<strong>Starting analysis: </strong>".$starting_analysis."<br>";
-	echo "<strong>Analysis perturbation number: </strong>".$analysis_perturbation_number."<br>";
-	echo "<strong>Start date: </strong>".$start_date."<br>";
-	echo "<strong>End date: </strong>".$end_date."<br>";
-	echo "<strong>Spectral horizontal resolution: </strong>".$spectral_horizontal_resolution."<br>";
-	echo "<strong>Gridpoint horizontal resolution: </strong>".$gridpoint_horizontal_resolution."<br>";
-	echo "<strong>Vertical resolution: </strong>".$vertical_resolution."<br>";
-	if (!empty($batches_used)){
-		$split = explode(",", $batches_used);
-        	$out .= implode(", ", $split) . "\r\n";
-		echo "<strong>Batches used: </strong>".$out."<br>";
-	}
+    echo "<strong>Filename: </strong>".$file_name."<br>";
+    echo "<strong>Create time: </strong>".$create_time."<br>";
+    echo "<strong>Created by: </strong>".$created_by."<br>";
+    echo "<strong>Description: </strong>".$description."<br>";
+    echo "<strong>Ancil type: </strong>".$ancil_type."<br>";
+    echo "<strong>Ancil sub-type: </strong>".$ancil_sub_type."<br>";
+    echo "<strong>Model version number: </strong>".$model_version_number."<br>";
+    echo "<strong>ECMWF Experiment ID: </strong>".$exptid."<br>";
+    echo "<strong>Starting analysis: </strong>".$starting_analysis."<br>";
+    echo "<strong>Analysis perturbation number: </strong>".$analysis_perturbation_number."<br>";
+    echo "<strong>Start date: </strong>".$start_date."<br>";
+    echo "<strong>End date: </strong>".$end_date."<br>";
+    echo "<strong>Grid type: </strong>".$grid_type."<br>";
+    echo "<strong>Spectral horizontal resolution: </strong>".$spectral_horizontal_resolution."<br>";
+    echo "<strong>Gridpoint horizontal resolution: </strong>".$gridpoint_horizontal_resolution."<br>";
+    echo "<strong>Vertical resolution: </strong>".$vertical_resolution."<br>";
+    if (!empty($batches_used)){
+        $split = explode(",", $batches_used);
+            $out .= implode(", ", $split) . "\r\n";
+        echo "<strong>Batches used: </strong>".$out."<br>";
+    }
     echo "<strong>md5sum: </strong>".$md5sum."<br>";
-	echo "<strong>url: </strong><a href=".$url.">".$url."</a><br>";
-	echo "<strong>Status: </strong>".$status."<br>";
+    echo "<strong>url: </strong><a href=".$url.">".$url."</a><br>";
+    echo "<strong>Status: </strong>".$status."<br>";
    }
 
    /* free results */
@@ -97,14 +98,14 @@ while ($query->fetch()){
 #$row=$result->fetch_row();
 #$out="";
 #foreach(array_keys($fields_array) as $key) {
-#	if ($fields_array[$key] == 'batches_used'){
-#		$split = explode(",", $row[$key]);
-#		$out .= implode(", ", $split) . "\r\n";
-#		echo "<strong>".$fields_array[$key].": </strong>".$out."<br>";
-#	}
-#	else {
-#		echo "<strong>".$fields_array[$key].": </strong>".$row[$key]."<br>";
-#	}
+#   if ($fields_array[$key] == 'batches_used'){
+#       $split = explode(",", $row[$key]);
+#       $out .= implode(", ", $split) . "\r\n";
+#       echo "<strong>".$fields_array[$key].": </strong>".$out."<br>";
+#   }
+#   else {
+#       echo "<strong>".$fields_array[$key].": </strong>".$row[$key]."<br>";
+#   }
 # }
 
  ?>
