@@ -78,6 +78,7 @@ while ($query->fetch()){
         	$out .= implode(", ", $split) . "\r\n";
 		echo "<strong>Batches used: </strong>".$out."<br>";
 	}
+    echo "<strong>md5sum: </strong>".$md5sum."<br>";
 	echo "<strong>url: </strong><a href=".$url.">".$url."</a><br>";
 	echo "<strong>Status: </strong>".$status."<br>";
    }
