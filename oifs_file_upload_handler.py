@@ -1,6 +1,7 @@
-#!/usr/bin/python2.7
+#!/usr/bin/python
 
-import MySQLdb
+import pymysql
+import pymysql.converters
 import os, sys
 import numpy as np 
 import argparse
@@ -16,14 +17,23 @@ import re
 site='dev'
 
 # setup database connection
+my_conv = pymysql.converters.conversions
 db_config='/storage/www/cpdnboinc_'+site+'/ancil_batch_user_config.xml'
 tree=ET.parse(db_config)
 db_host=tree.find('ancil_db_host').text
 db_user=tree.find('ancil_user').text
 db_passwd=tree.find('ancil_passwd').text
 db_name=tree.find('ancil_db_name').text
-db = MySQLdb.connect(db_host,db_user,db_passwd,db_name)
-cursor = db.cursor(MySQLdb.cursors.DictCursor)
+
+connection_params = {
+    'host' : db_host, 'user' : db_user, 'conv' : my_conv,
+    'passwd' : db_passwd, 'db' : db_name }
+if db_host == 'localhost':
+    #GC on Pandia, this file doesn't exist?
+    connection_params['unix_socket'] = "/storage/mysql/mysql.sock"
+
+db = pymysql.connect(**connection_params)
+cursor = db.cursor(pymysql.cursors.DictCursor)
 
 os.environ["GRIB_DEFINITION_PATH"] = "/home/boinc/eccodes/definitions"
 grib_dir="/home/boinc/eccodes/build/bin/"
@@ -58,15 +68,15 @@ def unpack_upload_file(Args):
                 print("Making zipfile "+zipname)
                 shutil.make_archive(adir+zipname,"zip",dirName)
     
-                md5_info=subprocess.check_output(['md5sum',adir+zipname+'.zip']) 
+                md5_info=subprocess.check_output(['md5sum',adir+zipname+'.zip'],text=True)
                 md5sum=md5_info.split()[0]
                 query=get_query(Args,grib_info,zipname+'.zip',md5sum)
                 try:
                     print("Adding "+zipname+".zip to the database")
                     cursor.execute(query)
                     db.commit()
-                except Exception,e:
-                    print 'Error adding file:',zipname+".zip",e
+                except Exception as e:
+                    print('Error adding file:',zipname+".zip",e)
                     db.rollback()
                     os.remove(adir+zipname+'.zip')
                     continue
@@ -81,15 +91,15 @@ def unpack_upload_file(Args):
                     print("Making zipfile "+zipname)
                     shutil.make_archive(adir+zipname,"zip",dirName+"/"+analysis_no)
     
-                    md5_info=subprocess.check_output(['md5sum',adir+zipname+'.zip'])
+                    md5_info=subprocess.check_output(['md5sum',adir+zipname+'.zip'],text=True)
                     md5sum=md5_info.split()[0]
                     query=get_query(Args,grib_info,zipname+'.zip',md5sum)
                     try:
                         print("Adding "+zipname+".zip to the database")
                         cursor.execute(query)
                         db.commit()
-                    except Exception,e:
-                        print 'Error adding file:',zipname+".zip",e
+                    except Exception as e:
+                        print('Error adding file:',zipname+".zip",e)
                         db.rollback()
                         os.remove(adir+zipname+'.zip')
                         continue
@@ -105,7 +115,9 @@ def consistency_check(ic_files,exptid,ddir):
     start_dates=[]
     for ic_file in ic_files:
         print("Checking %s file" %ic_file)
-        info=subprocess.check_output([grib_dir+"grib_ls","-w", "count=1", "-p", "experimentVersionNumber,dataDate,dataTime",ddir+"/"+ic_file])
+        info=subprocess.check_output(
+                [grib_dir+"grib_ls","-w", "count=1", "-p", "experimentVersionNumber,dataDate,dataTime",ddir+"/"+ic_file],
+                text=True)
         lines=info.split("\n")
         line=lines[2].split()
         #Bypass exptid check for ICMCL file as fields can have climatologies with exptid of "0001" and be valid.
@@ -139,7 +151,9 @@ def get_grib_info(exptid,analysis_no,ddir):
     file_info["exptid"]=exptid
     file_info["analysis_number"]=analysis_no
 
-    info=subprocess.check_output([grib_dir+"grib_ls","-w", "count=1", "-p", "perturbationNumber,M",ddir+"/"+ICMSH_file])
+    info=subprocess.check_output(
+            [grib_dir+"grib_ls","-w", "count=1", "-p", "perturbationNumber,M",ddir+"/"+ICMSH_file],
+            text=True)
     ICMSH_lines=info.split("\n")
     ICMSH_line=ICMSH_lines[2].split()
     
@@ -151,7 +165,9 @@ def get_grib_info(exptid,analysis_no,ddir):
     file_info["spectral_horizontal_resolution"]=ICMSH_hres
 
     # Get the end date from the ICMCL file
-    info=subprocess.check_output([grib_dir+"grib_ls","-w", "shortName=stl1", "-p", "shortName,dataDate,dataTime",ddir+"/"+ICMCL_file])
+    info=subprocess.check_output(
+            [grib_dir+"grib_ls","-w", "shortName=stl1", "-p", "shortName,dataDate,dataTime",ddir+"/"+ICMCL_file],
+            text=True)
     ICMCL_lines_data=info.split("messages")[0]
     ICMCL_lines=ICMCL_lines_data.split("\n")
     ICMCL_line=ICMCL_lines[-2].split()
@@ -159,7 +175,9 @@ def get_grib_info(exptid,analysis_no,ddir):
     file_info["end_date"]=ICMCL_line[1]+end_hour 
     
     # Get the vertical resolution from the ICMSH file
-    info=subprocess.check_output([grib_dir+"grib_ls","-w", "shortName=vo", "-p", "shortName,level",ddir+"/"+ICMSH_file])
+    info=subprocess.check_output(
+            [grib_dir+"grib_ls","-w", "shortName=vo", "-p", "shortName,level",ddir+"/"+ICMSH_file],
+            text=True)
     ICMSH_lines_data=info.split("messages")[0]
     ICMSH_lines=ICMSH_lines_data.split("\n")
     ICMSH_line=ICMSH_lines[-2].split()
@@ -167,7 +185,9 @@ def get_grib_info(exptid,analysis_no,ddir):
 
 
     # Get the grid point horizonal resolution
-    info=subprocess.check_output([grib_dir+"grib_ls","-w", "count=1", "-p", "N,isOctahedral",ddir+"/"+ICMGG_file])
+    info=subprocess.check_output(
+            [grib_dir+"grib_ls","-w", "count=1", "-p", "N,isOctahedral",ddir+"/"+ICMGG_file],
+            text=True)
     ICMGG_lines_data=info.split("messages")[0]
     ICMGG_lines=ICMGG_lines_data.split("\n")
     ICMGG_line=ICMGG_lines[-2].split()
@@ -185,7 +205,9 @@ def get_grib_info(exptid,analysis_no,ddir):
     file_info["grid_type"]=ICMGG_grid
 
     # Get the grid point horizonal resolution
-    info=subprocess.check_output([grib_dir+"grib_ls","-w", "count=1", "-p", "N,isOctahedral",ddir+"/"+ICMGGUA_file])
+    info=subprocess.check_output(
+            [grib_dir+"grib_ls","-w", "count=1", "-p", "N,isOctahedral",ddir+"/"+ICMGGUA_file],
+            text=True)
     ICMGGUA_lines_data=info.split("messages")[0]
     ICMGGUA_lines=ICMGGUA_lines_data.split("\n")
     ICMGGUA_line=ICMGGUA_lines[-2].split()
@@ -241,7 +263,7 @@ def upload_file(Vars):
 
     print("Uploading file...")    
     ancil_dir="/storage/cpdn_ancil_files/oifs_ancil_files/"+Vars.ancil_type
-    md5_info=subprocess.check_output(['md5sum',tmp_dir+Vars.ulfile])
+    md5_info=subprocess.check_output(['md5sum',tmp_dir+Vars.ulfile],text=True)
     md5sum=md5_info.split()[0]
    
     grid_hres_parts=re.split('(\d.*)',Vars.grid_hres)
@@ -260,8 +282,8 @@ def upload_file(Vars):
         print("Moving file into the repository...")
         shutil.move(tmp_dir+Vars.ulfile,adir)
         db.commit()
-    except Exception,e:
-        print 'Error add file:',Vars.ulfile,e
+    except Exception as e:
+        print('Error add file:',Vars.ulfile,e)
         db.rollback()
 
     
