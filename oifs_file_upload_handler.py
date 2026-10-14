@@ -18,24 +18,22 @@ from eccodes_config import discover_eccodes
 
 site='main'
 
-# setup database connection
-my_conv = pymysql.converters.conversions
-db_config='/storage/www/cpdnboinc/ancil_batch_user_config.xml'
-tree=ET.parse(db_config)
-db_host=tree.find('ancil_db_host').text
-db_user=tree.find('ancil_user').text
-db_passwd=tree.find('ancil_passwd').text
-db_name=tree.find('ancil_db_name').text
 
-connection_params = {
-    'host' : db_host, 'user' : db_user, 'conv' : my_conv,
-    'passwd' : db_passwd, 'db' : db_name }
-if db_host == 'localhost':
-    #GC on Pandia, this file doesn't exist?
-    connection_params['unix_socket'] = "/storage/mysql/mysql.sock"
-
-db = pymysql.connect(**connection_params)
-cursor = db.cursor(pymysql.cursors.DictCursor)
+def connect_database():
+    """Read protected configuration and open the ancillary database on demand."""
+    db_config = '/storage/www/cpdnboinc/ancil_batch_user_config.xml'
+    tree = ET.parse(db_config)
+    db_host = tree.find('ancil_db_host').text
+    connection_params = {
+        'host': db_host,
+        'user': tree.find('ancil_user').text,
+        'conv': pymysql.converters.conversions,
+        'passwd': tree.find('ancil_passwd').text,
+        'db': tree.find('ancil_db_name').text,
+    }
+    if db_host == 'localhost':
+        connection_params['unix_socket'] = '/storage/mysql/mysql.sock'
+    return pymysql.connect(**connection_params)
 
 
 def unpack_upload_file(Args):
@@ -70,16 +68,15 @@ def unpack_upload_file(Args):
     
                 md5_info=subprocess.check_output(['md5sum',adir+zipname+'.zip'],text=True)
                 md5sum=md5_info.split()[0]
-                query=get_query(Args,grib_info,zipname+'.zip',md5sum)
+                query, parameters=get_query(Args,grib_info,zipname+'.zip',md5sum)
                 try:
                     print("Adding "+zipname+".zip to the database")
-                    cursor.execute(query)
+                    cursor.execute(query, parameters)
                     db.commit()
-                except Exception as e:
-                    print('Error adding file:',zipname+".zip",e)
+                except Exception:
+                    # Stop before success cleanup; retain files for recovery review.
                     db.rollback()
-                    os.remove(adir+zipname+'.zip')
-                    continue
+                    raise
 
             else:
                 for analysis_no in analysis_nos:
@@ -93,16 +90,15 @@ def unpack_upload_file(Args):
     
                     md5_info=subprocess.check_output(['md5sum',adir+zipname+'.zip'],text=True)
                     md5sum=md5_info.split()[0]
-                    query=get_query(Args,grib_info,zipname+'.zip',md5sum)
+                    query, parameters=get_query(Args,grib_info,zipname+'.zip',md5sum)
                     try:
                         print("Adding "+zipname+".zip to the database")
-                        cursor.execute(query)
+                        cursor.execute(query, parameters)
                         db.commit()
-                    except Exception as e:
-                        print('Error adding file:',zipname+".zip",e)
+                    except Exception:
+                        # Stop before success cleanup; retain files for recovery review.
                         db.rollback()
-                        os.remove(adir+zipname+'.zip')
-                        continue
+                        raise
 
     # Cleaning up tmp_dir
     print("Cleaning up")
@@ -241,18 +237,35 @@ def get_hour(time):
 
 def get_query(Vars,GribInfo,fname,md5sum):
     if Vars.sub_type!="0":
-        url = "http://"+site+".cpdn.org/oifs_ancil_files/"+Vars.ancil_type+"/"+Vars.sub_type+"/"+fname
+        url = "https://"+site+".cpdn.org/oifs_ancil_files/"+Vars.ancil_type+"/"+Vars.sub_type+"/"+fname
     else:
         if Vars.ancil_type=="ic_ancil":
             expt_path=GribInfo['exptid']+"/"+GribInfo['start_date']+"/"+GribInfo['analysis_number']+"/"+fname
-            url = "http://"+site+".cpdn.org/oifs_ancil_files/"+Vars.ancil_type+"/"+expt_path
+            url = "https://"+site+".cpdn.org/oifs_ancil_files/"+Vars.ancil_type+"/"+expt_path
         else:
-            url = "http://"+site+".cpdn.org/oifs_ancil_files/"+Vars.ancil_type+"/"+fname
+            url = "https://"+site+".cpdn.org/oifs_ancil_files/"+Vars.ancil_type+"/"+fname
 
-    query= 'insert into oifs_ancil_files (file_name, created_by, uploaded_by, description, ancil_type, ancil_sub_type, model_version_number, exptid, starting_analysis, analysis_perturbation_number, start_date, end_date, grid_type, spectral_horizontal_resolution, gridpoint_horizontal_resolution, vertical_resolution, md5sum, url) '
-    query=query+" values ('"+fname+"','"+Vars.created_by+"','"+Vars.uploaded_by+"','"+Vars.file_desc+"','"+Vars.ancil_type+"',"+Vars.sub_type+",'"+Vars.model_version+"','"+GribInfo['exptid']+"','"+Vars.starting_analysis+"','"+GribInfo['analysis_number']+"','"+GribInfo['start_date']+"','"+GribInfo['end_date']+"','"+GribInfo['grid_type']+"','"+GribInfo['spectral_horizontal_resolution']+"','"+GribInfo['gridpoint_horizontal_resolution']+"','"+GribInfo['vertical_resolution']+"','"+md5sum+"','"+url+"')"
+    query = (
+        "INSERT INTO oifs_ancil_files ("
+        "file_name, created_by, uploaded_by, description, ancil_type, "
+        "ancil_sub_type, model_version_number, exptid, starting_analysis, "
+        "analysis_perturbation_number, start_date, end_date, grid_type, "
+        "spectral_horizontal_resolution, gridpoint_horizontal_resolution, "
+        "vertical_resolution, md5sum, url) "
+        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, "
+        "%s, %s, %s, %s, %s, %s, %s, %s, %s)"
+    )
+    parameters = (
+        fname, Vars.created_by, Vars.uploaded_by, Vars.file_desc,
+        Vars.ancil_type, Vars.sub_type, Vars.model_version, GribInfo['exptid'],
+        Vars.starting_analysis, GribInfo['analysis_number'],
+        GribInfo['start_date'], GribInfo['end_date'], GribInfo['grid_type'],
+        GribInfo['spectral_horizontal_resolution'],
+        GribInfo['gridpoint_horizontal_resolution'],
+        GribInfo['vertical_resolution'], md5sum, url,
+    )
+    return query, parameters
 
-    return query
 
 def upload_file(Vars):
     tmp_dir="/storage/www/cpdnboinc/tmp_ancil_upload/"
@@ -270,21 +283,31 @@ def upload_file(Vars):
 
     if Vars.ancil_type=="ifsdata":
         adir=ancil_dir+"/"+Vars.sub_type
-        url = "http://"+site+".cpdn.org/oifs_ancil_files/"+Vars.ancil_type+"/"+Vars.sub_type+"/"+Vars.ulfile
+        url = "https://"+site+".cpdn.org/oifs_ancil_files/"+Vars.ancil_type+"/"+Vars.sub_type+"/"+Vars.ulfile
     else:
         adir=ancil_dir
-        url = "http://"+site+".cpdn.org/oifs_ancil_files/"+Vars.ancil_type+"/"+Vars.ulfile
-    query= 'insert into oifs_ancil_files (file_name, created_by, uploaded_by, description, ancil_type, ancil_sub_type, model_version_number, grid_type, spectral_horizontal_resolution, md5sum, url) '
-    query=query+" values ('"+Vars.ulfile+"','"+Vars.created_by+"','"+Vars.uploaded_by+"','"+Vars.file_desc+"','"+Vars.ancil_type+"','"+Vars.sub_type+"','"+Vars.model_version+"','"+grid_hres_parts[0]+"','"+grid_hres_parts[1]+"','"+md5sum+"','"+url+"')"
+        url = "https://"+site+".cpdn.org/oifs_ancil_files/"+Vars.ancil_type+"/"+Vars.ulfile
+    query = (
+        "INSERT INTO oifs_ancil_files ("
+        "file_name, created_by, uploaded_by, description, ancil_type, "
+        "ancil_sub_type, model_version_number, grid_type, "
+        "spectral_horizontal_resolution, md5sum, url) "
+        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+    )
+    parameters = (
+        Vars.ulfile, Vars.created_by, Vars.uploaded_by, Vars.file_desc,
+        Vars.ancil_type, Vars.sub_type, Vars.model_version,
+        grid_hres_parts[0], grid_hres_parts[1], md5sum, url,
+    )
     try:
         print("Adding "+Vars.ulfile+" to the database")
-        cursor.execute(query)
+        cursor.execute(query, parameters)
         print("Moving file into the repository...")
         shutil.move(tmp_dir+Vars.ulfile,adir)
         db.commit()
-    except Exception as e:
-        print('Error add file:',Vars.ulfile,e)
+    except Exception:
         db.rollback()
+        raise
 
     
     
@@ -304,12 +327,20 @@ def main():
     parser.add_argument("ulfile", help="The upload file")
     args = parser.parse_args()
 
-    if args.ancil_type == "ic_ancil":
-        global grib_ls_path
-        grib_ls_path, _ = discover_eccodes()
-        unpack_upload_file(args)
-    else:
-        upload_file(args)
+    global db, cursor, grib_ls_path
+    db = connect_database()
+    try:
+        cursor = db.cursor(pymysql.cursors.DictCursor)
+        try:
+            if args.ancil_type == "ic_ancil":
+                grib_ls_path, _ = discover_eccodes()
+                unpack_upload_file(args)
+            else:
+                upload_file(args)
+        finally:
+            cursor.close()
+    finally:
+        db.close()
 
     print('Finished!')
 

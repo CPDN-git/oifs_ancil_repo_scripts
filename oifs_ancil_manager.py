@@ -71,7 +71,7 @@ def deprecate_and_delete(filename,replaced_by=None,dry_run=False):
         else:
             replace_string=''
         query2="update oifs_ancil_files set url='',status=3"+replace_string+" where file_name='"+row['file_name']+"'"
-        filepath=basepath+row['url'].split('http://main.cpdn.org/oifs_ancil_files/')[1]
+        filepath=basepath+row['url'].split('://main.cpdn.org/oifs_ancil_files/', 1)[1]
         if not dry_run:
             cursor.execute(query2)
             os.remove(filepath)
@@ -92,7 +92,7 @@ def delete_completely(filename,dry_run=False):
                 print(row['file_name'])
                 query2="delete from oifs_ancil_files where file_name='"+row['file_name']+"'"
                 print(row['url'])
-                filepath=basepath+row['url'].split('http://main.cpdn.org/oifs_ancil_files')[1]
+                filepath=basepath+row['url'].split('://main.cpdn.org/oifs_ancil_files', 1)[1]
                 print('filepath',filepath)
                 if not dry_run:
                         cursor.execute(query2)

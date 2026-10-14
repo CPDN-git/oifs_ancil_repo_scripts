@@ -84,7 +84,7 @@ if(isset($_POST['submit'])) {
     $by_exptid = $_POST['by_exptid'];
     //Do real escaping here
 
-    $query = "SELECT CONCAT('<a href=http://dev.cpdn.org/oifs_ancil_details.php?file_name=',file_name,'>',file_name,'</a>') as 'File name', date(create_time) as 'Creation date', created_by as 'Created by', description as 'Description', ancil_type as 'Type', IF(STRCMP(ancil_sub_type,'0') = 0,'',ancil_sub_type) as 'Sub type', model_version_number as 'Model version', exptid as 'Exptid', starting_analysis as 'Starting analysis', analysis_perturbation_number as 'Analysis number', start_date as 'Start date', end_date as 'End date', CONCAT(COALESCE(grid_type,''),COALESCE(spectral_horizontal_resolution,''),COALESCE(gridpoint_horizontal_resolution,'')) as 'Horizontal resolution', vertical_resolution as 'Vertical resolution', batches_used as 'Batches used'  FROM ".$dbname.".oifs_ancil_files";
+    $query = "SELECT CONCAT('<a href=https://dev.cpdn.org/oifs_ancil_details.php?file_name=',file_name,'>',file_name,'</a>') as 'File name', date(create_time) as 'Creation date', created_by as 'Created by', description as 'Description', ancil_type as 'Type', IF(STRCMP(ancil_sub_type,'0') = 0,'',ancil_sub_type) as 'Sub type', model_version_number as 'Model version', exptid as 'Exptid', starting_analysis as 'Starting analysis', analysis_perturbation_number as 'Analysis number', start_date as 'Start date', end_date as 'End date', CONCAT(COALESCE(grid_type,''),COALESCE(spectral_horizontal_resolution,''),COALESCE(gridpoint_horizontal_resolution,'')) as 'Horizontal resolution', vertical_resolution as 'Vertical resolution', batches_used as 'Batches used'  FROM ".$dbname.".oifs_ancil_files";
     $conditions = array();
 
     if(! empty($by_name)) {
