@@ -1,4 +1,4 @@
-#!/usr/bin/env/bash
+#!/usr/bin/env bash
 #
 #  simple script to deploy required files to user space (html/user)
 #
