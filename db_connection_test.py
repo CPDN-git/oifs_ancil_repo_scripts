@@ -3,10 +3,9 @@
 import pymysql
 import xml.etree.ElementTree as ET
 
-site='dev'
 
 # setup database connection
-db_config='/storage/www/cpdnboinc_'+site+'/ancil_batch_user_config.xml'
+db_config='/storage/www/cpdnboinc/ancil_batch_user_config.xml'
 tree=ET.parse(db_config)
 db_host=tree.find('ancil_db_host').text
 db_local_host=tree.find('ancil_local_db_host').text
