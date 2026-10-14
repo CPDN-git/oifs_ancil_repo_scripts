@@ -14,11 +14,11 @@ import subprocess
 import zipfile
 import re
 
-site='dev'
+site='main'
 
 # setup database connection
 my_conv = pymysql.converters.conversions
-db_config='/storage/www/cpdnboinc_'+site+'/ancil_batch_user_config.xml'
+db_config='/storage/www/cpdnboinc/ancil_batch_user_config.xml'
 tree=ET.parse(db_config)
 db_host=tree.find('ancil_db_host').text
 db_user=tree.find('ancil_user').text
@@ -40,7 +40,7 @@ grib_dir="/home/boinc/eccodes/build/bin/"
 
 def unpack_upload_file(Args):
     dates=[]
-    tmp_dir="/storage/www/cpdnboinc_"+site+"/tmp_ancil_upload/"
+    tmp_dir="/storage/www/cpdnboinc/tmp_ancil_upload/"
     ancil_dir="/storage/cpdn_ancil_files/oifs_ancil_files/"+Args.ancil_type
     print("Extracting tarfile "+Args.ulfile+" to "+tmp_dir)
     tar= tarfile.open(tmp_dir+Args.ulfile)
@@ -255,7 +255,7 @@ def get_query(Vars,GribInfo,fname,md5sum):
     return query
 
 def upload_file(Vars):
-    tmp_dir="/storage/www/cpdnboinc_"+site+"/tmp_ancil_upload/"
+    tmp_dir="/storage/www/cpdnboinc/tmp_ancil_upload/"
     if Vars.ancil_type!="fullpos_namelist":
         ulfile_zip=zipfile.ZipFile(tmp_dir+Vars.ulfile)
         ret=ulfile_zip.testzip()
