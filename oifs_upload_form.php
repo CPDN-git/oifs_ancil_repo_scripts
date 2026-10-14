@@ -83,7 +83,7 @@ header('Cache-Control: no-store');
                 <option value="SO4_files">SO4 files</option>
             </select>
         </div>
-        <?php foreach ( '43r3' => ['Tl159', 'Tl255', 'Tl319', 'Tl399', 'Tco95', 'Tco199']] as $version => $grids): ?>
+        <?php foreach (['43r3' => ['Tl159', 'Tl255', 'Tl319', 'Tl399', 'Tco95', 'Tco199']] as $version => $grids): ?>
         <div id="gridInfo<?= $version ?>" hidden>
             <label for="grid_hres_<?= $version ?>">Horizontal resolution and grid (<?= $version ?>)</label>
             <select id="grid_hres_<?= $version ?>" name="grid_hres_<?= $version ?>" disabled>
@@ -150,7 +150,6 @@ header('Cache-Control: no-store');
             const grid = type.value === 'ifsdata' || type.value === 'climate_data';
             showFields('subType', type.value === 'ifsdata');
             showFields('ic_ancil_descriptions', type.value === 'ic_ancil');
-            showFields('gridInfo40r1', grid && version.value === '40r1');
             showFields('gridInfo43r3', grid && version.value === '43r3');
         }
         type.addEventListener('change', updateFields);
