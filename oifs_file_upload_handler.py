@@ -14,6 +14,8 @@ import subprocess
 import zipfile
 import re
 
+from eccodes_config import discover_eccodes
+
 site='main'
 
 # setup database connection
@@ -35,8 +37,6 @@ if db_host == 'localhost':
 db = pymysql.connect(**connection_params)
 cursor = db.cursor(pymysql.cursors.DictCursor)
 
-os.environ["GRIB_DEFINITION_PATH"] = "/home/boinc/eccodes/definitions"
-grib_dir="/home/boinc/eccodes/build/bin/"
 
 def unpack_upload_file(Args):
     dates=[]
@@ -116,7 +116,7 @@ def consistency_check(ic_files,exptid,ddir):
     for ic_file in ic_files:
         print("Checking %s file" %ic_file)
         info=subprocess.check_output(
-                [grib_dir+"grib_ls","-w", "count=1", "-p", "experimentVersionNumber,dataDate,dataTime",ddir+"/"+ic_file],
+                [grib_ls_path,"-w", "count=1", "-p", "experimentVersionNumber,dataDate,dataTime",ddir+"/"+ic_file],
                 text=True)
         lines=info.split("\n")
         line=lines[2].split()
@@ -152,7 +152,7 @@ def get_grib_info(exptid,analysis_no,ddir):
     file_info["analysis_number"]=analysis_no
 
     info=subprocess.check_output(
-            [grib_dir+"grib_ls","-w", "count=1", "-p", "perturbationNumber,M",ddir+"/"+ICMSH_file],
+            [grib_ls_path,"-w", "count=1", "-p", "perturbationNumber,M",ddir+"/"+ICMSH_file],
             text=True)
     ICMSH_lines=info.split("\n")
     ICMSH_line=ICMSH_lines[2].split()
@@ -166,7 +166,7 @@ def get_grib_info(exptid,analysis_no,ddir):
 
     # Get the end date from the ICMCL file
     info=subprocess.check_output(
-            [grib_dir+"grib_ls","-w", "shortName=stl1", "-p", "shortName,dataDate,dataTime",ddir+"/"+ICMCL_file],
+            [grib_ls_path,"-w", "shortName=stl1", "-p", "shortName,dataDate,dataTime",ddir+"/"+ICMCL_file],
             text=True)
     ICMCL_lines_data=info.split("messages")[0]
     ICMCL_lines=ICMCL_lines_data.split("\n")
@@ -176,7 +176,7 @@ def get_grib_info(exptid,analysis_no,ddir):
     
     # Get the vertical resolution from the ICMSH file
     info=subprocess.check_output(
-            [grib_dir+"grib_ls","-w", "shortName=vo", "-p", "shortName,level",ddir+"/"+ICMSH_file],
+            [grib_ls_path,"-w", "shortName=vo", "-p", "shortName,level",ddir+"/"+ICMSH_file],
             text=True)
     ICMSH_lines_data=info.split("messages")[0]
     ICMSH_lines=ICMSH_lines_data.split("\n")
@@ -186,7 +186,7 @@ def get_grib_info(exptid,analysis_no,ddir):
 
     # Get the grid point horizonal resolution
     info=subprocess.check_output(
-            [grib_dir+"grib_ls","-w", "count=1", "-p", "N,isOctahedral",ddir+"/"+ICMGG_file],
+            [grib_ls_path,"-w", "count=1", "-p", "N,isOctahedral",ddir+"/"+ICMGG_file],
             text=True)
     ICMGG_lines_data=info.split("messages")[0]
     ICMGG_lines=ICMGG_lines_data.split("\n")
@@ -206,7 +206,7 @@ def get_grib_info(exptid,analysis_no,ddir):
 
     # Get the grid point horizonal resolution
     info=subprocess.check_output(
-            [grib_dir+"grib_ls","-w", "count=1", "-p", "N,isOctahedral",ddir+"/"+ICMGGUA_file],
+            [grib_ls_path,"-w", "count=1", "-p", "N,isOctahedral",ddir+"/"+ICMGGUA_file],
             text=True)
     ICMGGUA_lines_data=info.split("messages")[0]
     ICMGGUA_lines=ICMGGUA_lines_data.split("\n")
@@ -305,6 +305,8 @@ def main():
     args = parser.parse_args()
 
     if args.ancil_type == "ic_ancil":
+        global grib_ls_path
+        grib_ls_path, _ = discover_eccodes()
         unpack_upload_file(args)
     else:
         upload_file(args)

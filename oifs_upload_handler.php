@@ -380,7 +380,7 @@ try {
             upload_error('No matching unprocessed upload was found.', 409);
         }
         $python = defined('OIFS_UPLOAD_PYTHON') ? OIFS_UPLOAD_PYTHON
-            : '/home/boinc/miniconda3/envs/oifs_pyenv/bin/python';
+            : '/home/boinc/miniconda3/envs/py3new/bin/python';
         $script = defined('OIFS_UPLOAD_SCRIPT') ? OIFS_UPLOAD_SCRIPT
             : '/storage/www/cpdnboinc/oifs_ancil_repo_scripts/oifs_file_upload_handler.py';
         $timeout = defined('OIFS_UPLOAD_TIMEOUT') ? OIFS_UPLOAD_TIMEOUT : 300;
