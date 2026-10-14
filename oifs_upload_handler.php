@@ -192,8 +192,7 @@ function validated_metadata(): array {
     }
     if ($type === 'ifsdata' || $type === 'climate_data') {
         $grid = post_text('grid_hres_' . $version);
-        $grids = $version === '40r1' ? ['Tl159', 'Tl255']
-            : ['Tl159', 'Tl255', 'Tl319', 'Tl399', 'Tco95', 'Tco199'];
+        $grids = ['Tl159', 'Tl255', 'Tl319', 'Tl399', 'Tco95', 'Tco199'];
         if (!in_array($grid, $grids, true)) {
             upload_error('Select a grid supported by the model version.');
         }
