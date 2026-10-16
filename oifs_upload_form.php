@@ -14,6 +14,7 @@ define('PROJECT_PATH', realpath(__DIR__ . '/../../..') . '/');   // i.e. /storag
 define('CPDN_LOCAL',   __DIR__ );
 define('BOINC_INC',    PROJECT_PATH . 'html/inc/');
 define('LOCAL_INC',    __DIR__ . '/include/');
+define('PROJECT_INC',  PROJECT_PATH . 'html/project');
 
 // =========================================================================
 // 2. CLIENT-SIDE PATHS (HTML) - *MUST* always start with "/" to target the domain root
@@ -35,7 +36,7 @@ set_include_path(
 require_once(BOINC_INC . 'util.inc');
 require_once(BOINC_INC . 'user.inc');
 require_once(BOINC_INC . 'boinc_db.inc');
-require_once(BOINC_INC . 'oifs_uploaders.inc');
+require_once(PROJECT_INC . 'oifs_uploaders.inc');
 
 // BOINC's default login redirect drops the directory from the return URL.
 $user = get_logged_in_user(false);
