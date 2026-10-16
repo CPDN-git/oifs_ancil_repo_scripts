@@ -57,6 +57,7 @@ deploy_files=(
     oifs_upload_form.php
     oifs_upload_handler.php
     oifs_search.php
+    oifs_ancil_details.php
 )
 
 for file in "${deploy_files[@]}"
