@@ -1,275 +1,294 @@
 <?php
-// This file is part of BOINC.
-// https://boinc.berkeley.edu
-// Copyright (C) 2008 University of California
-//
-// BOINC is free software; you can redistribute it and/or modify it
-// under the terms of the GNU Lesser General Public License
-// as published by the Free Software Foundation,
-// either version 3 of the License, or (at your option) any later version.
-//
-// BOINC is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-// See the GNU Lesser General Public License for more details.
-//
-// You should have received a copy of the GNU Lesser General Public License
-// along with BOINC.  If not, see <https://www.gnu.org/licenses/>.
 
-// CPDN OpenIFS ancillary upload form. Deploy in html/user/ with the handler.
-require_once __DIR__ . '/../inc/util.inc';
-require_once __DIR__ . '/../inc/boinc_db.inc';
-require_once __DIR__ . '/../project/oifs_uploaders.inc';
+//  OpenIFS ancil file upload form
+
+// Force PHP to show structural errors
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
+// =========================================================================
+// 1. SERVER-SIDE PATHS (PHP) - Always use explicit absolute paths
+// =========================================================================
+define('PROJECT_PATH', realpath(__DIR__ . '/../../..') . '/');   // i.e. /storage/www/cpdnboinc
+define('CPDN_LOCAL',   __DIR__ );
+define('BOINC_INC',    PROJECT_PATH . 'html/inc/');
+define('LOCAL_INC',    __DIR__ . '/include/');
+
+// =========================================================================
+// 2. CLIENT-SIDE PATHS (HTML) - *MUST* always start with "/" to target the domain root
+//    e.g. src="/img/mylogo.png"  and not  src="../img/mylogo.png"
+//    Where "/img/mylogo.png"   means  main.cpdn.org/img/mylogo.png
+// =========================================================================
+
+
+//  Now switch to boinc's html root so all the includes load correctly
+chdir(CPDN_LOCAL . '/..');
+
+
+require_once( BOINC_INC . "util.inc");
+require_once( BOINC_INC . "user.inc");
+require_once( BOINC_INC . "boinc_db.inc");
+require_once( BOINC_INC . "oifs_uploaders.inc");
 
 $user = get_logged_in_user();
-if (!$user || !isset($allowed_uploaders) || !is_array($allowed_uploaders)
-    || !in_array($user->email_addr, $allowed_uploaders, true)) {
-    http_response_code(403);
-    exit('You are not authorized to upload ancillary files.');
+if (in_array($user->email_addr,$allowed_uploaders)){
+        echo "";
+} else {
+        echo "You are not allowed to visit this page. Please login";
+        exit;
 }
-$upload_id = bin2hex(random_bytes(16));
-$upload_expires = time() + 86400;
-$upload_token = hash_hmac('sha256', $user->id . ':' . $upload_id . ':' . $upload_expires,
-    $user->authenticator);
-header('Content-Type: text/html; charset=UTF-8');
-header('Cache-Control: no-store');
-?>
-<!doctype html>
-<html lang="en">
+
+echo <<<EOH
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="robots" content="noindex, nofollow">
-    <title>OpenIFS@home ancillary file upload</title>
-    <link rel="stylesheet" href="cpdn.css">
-    <script src="js/plupload.full.min.js" defer></script>
+<title>OpenIFS@home Ancil upload form</title>
+<META NAME="ROBOTS" CONTENT="NOINDEV, NOFOLLOW">
+<script type="text/javascript" src="/jquery/jquery-latest.js"></script>
+<script type="text/javascript" src="/jquery/jquery.tablesorter.js"></script>
+<script type="text/javascript" src="/js/plupload.full.min.js"></script>
+<script type="text/javascript">
+                        $(document).ready(function() {
+                                $("#myTable").tablesorter();
+                        });
+                </script>
+<script type="text/javascript">
+    function condDisp(ancil_type,model_version)
+{
+    switch(ancil_type){
+    case 'ic_ancil':
+        document.getElementById("ic_ancil_descriptions").style.display = 'block';
+        document.getElementById("gridInfo40r1").style.display = 'none';
+        document.getElementById("gridInfo43r3").style.display = 'none';
+        document.getElementById("subType").style.display = 'none';
+        document.getElementById("sub_type").value = "0";
+        document.getElementById("file_desc").value = "";
+    break;
+    case 'ifsdata':
+        document.getElementById("subType").style.display = 'block';
+        switch(model_version){
+            case '43r3':
+                document.getElementById("gridInfo43r3").style.display = 'block';
+                document.getElementById("gridInfo40r1").style.display = 'none';
+            break;
+            case '40r1':
+                document.getElementById("gridInfo40r1").style.display = 'block';
+                document.getElementById("gridInfo43r3").style.display = 'none';
+            break;
+            default:
+                document.getElementById("gridInfo43r3").style.display = 'block';
+                document.getElementById("gridInfo40r1").style.display = 'none';
+            break;
+        }    
+        document.getElementById("ic_ancil_descriptions").style.display = 'none';
+        document.getElementById("starting_analysis").value = "0";
+        document.getElementById("file_desc").value = "";
+    break;
+    case 'climate_data':
+        document.getElementById("subType").style.display = 'none';
+        switch(model_version){
+            case '43r3':
+                document.getElementById("gridInfo43r3").style.display = 'block';
+                document.getElementById("gridInfo40r1").style.display = 'none';
+            break;
+            case '40r1':
+                document.getElementById("gridInfo40r1").style.display = 'block';
+                document.getElementById("gridInfo43r3").style.display = 'none';
+            break;
+            default:
+                document.getElementById("gridInfo43r3").style.display = 'block';
+                document.getElementById("gridInfo40r1").style.display = 'none';
+            break;
+        }
+        document.getElementById("ic_ancil_descriptions").style.display = 'none';
+        document.getElementById("sub_type").value = "0";
+        document.getElementById("starting_analysis").value = "0";
+        document.getElementById("file_desc").value = "";
+        break;
+    case 'fullpos_namelist':
+        document.getElementById("subType").style.display = 'none';
+        document.getElementById("ic_ancil_descriptions").style.display = 'none';
+        document.getElementById("gridInfo40r1").style.display = 'none';
+        document.getElementById("gridInfo43r3").style.display = 'none';
+        document.getElementById("sub_type").value = "0";
+        document.getElementById("starting_analysis").value = "0";
+        document.getElementById("file_desc").value = "";
+        break;
+    default:
+        document.getElementById("subType").style.display = 'none';
+        document.getElementById("ic_ancil_descriptions").style.display = 'none';
+        document.getElementById("gridInfo40r1").style.display = 'none';
+        document.getElementById("gridInfo43r3").style.display = 'none';
+        document.getElementById("sub_type").value = "0";
+        document.getElementById("starting_analysis").value = "0";
+        document.getElementById("file_desc").value = "";
+    }
+}
+</script>
+
+<style type="text/css">
+                        #sortedtable thead th {
+                                color: #00f;
+                                font-weight: bold;
+                                text-decoration: underline;
+                        }
+                </style>
+<link rel="stylesheet" href="cpdn.css">
 </head>
 <body>
-    <header>
-        <img src="img/OIFS_Home_logo.png" alt="OpenIFS@home" width="200">
-        <img src="img/CPDN_abbrv_logo.png" alt="CPDN" width="250">
-    </header>
-    <h1>Upload an OpenIFS ancillary file</h1>
-    <p><?= htmlspecialchars($user->name, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?> is logged in.</p>
-    <p>Upload one file at a time, up to 5 GiB. Keep this page open until processing finishes.</p>
-    <noscript>This form requires JavaScript and a browser supporting HTML5 file uploads.</noscript>
-    <form id="upload_form" action="oifs_upload_handler.php" method="post">
-        <?= form_tokens($user->authenticator) ?>
-        <input type="hidden" name="upload_id" value="<?= $upload_id ?>">
-        <input type="hidden" name="upload_expires" value="<?= $upload_expires ?>">
-        <input type="hidden" name="upload_token" value="<?= $upload_token ?>">
-        <input type="hidden" id="fileName" name="fileName" value="">
-        <p><label for="created_by">Created by</label>
-            <input id="created_by" name="created_by" required maxlength="200"></p>
-        <p><label for="model_version">Model version</label>
-            <select id="model_version" name="model_version" required>
-                <option value="">Select</option>
-                <option value="43r3">43r3</option>
-            </select></p>
-        <p><label for="ancil_type">File type</label>
-            <select id="ancil_type" name="ancil_type" required>
-                <option value="">Select</option>
-                <option value="ic_ancil">Initial files (.tgz)</option>
-                <option value="ifsdata">ifsdata (.zip)</option>
-                <option value="climate_data">climate_data (.zip)</option>
-                <option value="fullpos_namelist">FullPos namelist (.nml)</option>
-            </select></p>
-        <div id="subType" hidden>
-            <label for="sub_type">Subtype</label>
-            <select id="sub_type" name="sub_type" disabled>
-                <option value="">Select</option>
+EOH;
+
+echo '<div class="wrap" style="width:100%">';
+echo '<div style="width:100%">';
+echo '<img src="/img/OIFS_Home_logo.png" alt="OpenIFS@home" style="width:200px">';
+echo '<img src="/img/CPDN_abbrv_logo.png" alt="CPDN" style="width:250px; float:right;">';
+echo '</div>';
+echo '<div style="clear: both;"></div>';
+echo '</div>';
+echo '<hr>';
+
+$max_post_size = ini_get('post_max_size');
+#echo $max_post_size;
+echo "<p>$user->name is logged in";
+    ?>
+    <p>Enter the following information to upload your experiment file(s).</p>
+    <form id="upload_form" name="upload_form" action="oifs_upload_handler.php" method="post" enctype="multipart/form-data" upload_max_filesize=300000000 post_max_size=500000000>
+    Created by: <input type="text" name="created_by">
+    Model version: <select name="model_version" class="dropdown" onchange="condDisp(ancil_type.value,this.value);">
+        <option value="0">Select</option>
+        <option value='40r1'>40r1</option>
+        <option value='43r3'>43r3</option>
+        </select>
+    File type: <select id="ancil_type" name="ancil_type" class="dropdown" onchange="condDisp(this.value, model_version.value);">
+        <option value="0">Select</option>
+        <option value="ic_ancil">initial files (as .tgz)</option>
+        <option value="ifsdata">ifsdata (as .zip) </option>
+        <option value="climate_data">climate_data (as .zip)</option>
+        <option value="fullpos_namelist">FullPos namelist (as .nml)</option>
+        </select><br><br>
+    
+    <div id="subType" name="subType" style="display: none;">
+    Sub type: <select id="sub_type" name="sub_type" class="dropdown">
+        <option value="0">Select</option>
                 <option value="GHG_files">GHG files</option>
                 <option value="other_radiation_files">Other radiation files</option>
                 <option value="SO4_files">SO4 files</option>
-            </select>
-        </div>
-        <?php foreach (['43r3' => ['Tl159', 'Tl255', 'Tl319', 'Tl399', 'Tco95', 'Tco199']] as $version => $grids): ?>
-        <div id="gridInfo<?= $version ?>" hidden>
-            <label for="grid_hres_<?= $version ?>">Horizontal resolution and grid (<?= $version ?>)</label>
-            <select id="grid_hres_<?= $version ?>" name="grid_hres_<?= $version ?>" disabled>
-                <option value="">Select</option>
-                <?php foreach ($grids as $grid): ?>
-                <option value="<?= $grid ?>"><?= $grid ?></option>
-                <?php endforeach; ?>
-            </select>
-            <a href="https://confluence.ecmwf.int/display/OIFS/4.3+OpenIFS%3A+Horizontal+Resolution+and+Configurations">Grid information</a>
-        </div>
-        <?php endforeach; ?>
-        <div id="ic_ancil_descriptions" hidden>
-            <p>Upload initial files as a .tgz with the directory structure
-                [exptid]/[start date time]/[analysis perturbation number]/[files].
-                Multiple dates and analysis numbers can be included. The analysis
-                perturbation directory can be omitted when only one exists.</p>
-            <p><label for="exptid">ECMWF experiment ID</label>
-                <input id="exptid" name="exptid" maxlength="4" size="4"
-                    pattern="[A-Za-z0-9]{4}" disabled></p>
-            <p><label for="starting_analysis">Starting analysis</label>
-                <select id="starting_analysis" name="starting_analysis" disabled>
-                    <option value="">Select</option>
-                    <option value="Operational">Operational</option>
-                    <option value="ERA5">ERA5</option>
-                    <option value="ERA-Interim">ERA-Interim</option>
-                    <option value="Other">Other</option>
-                </select></p>
-        </div>
-        <p><label for="file_desc">Case study scenario / description</label><br>
-            <textarea id="file_desc" name="file_desc" rows="3" cols="80"
-                maxlength="8000" required></textarea></p>
-        <div id="container">
-            <button id="pickfiles" type="button" disabled>Choose file</button>
-            <button id="uploadfiles" type="submit" disabled>Upload and process</button>
-        </div>
-        <p id="filelist">No file selected.</p>
-        <p id="console" role="status" aria-live="polite"></p>
-    </form>
-    <script>
-    document.addEventListener('DOMContentLoaded', function () {
-        'use strict';
-        const form = document.getElementById('upload_form');
-        const status = document.getElementById('console');
-        const list = document.getElementById('filelist');
-        const button = document.getElementById('uploadfiles');
-        const picker = document.getElementById('pickfiles');
-        const type = document.getElementById('ancil_type');
-        const version = document.getElementById('model_version');
-        let busy = false;
-        let failed = false;
-        let received = false;
-        let completed = false;
+                </select><br><br>
+    </div>
+    <div id="gridInfo40r1" name="gridInfo40r1" style="display: none;">
+    Horizontal resolution and Grid <a href="https://confluence.ecmwf.int/display/OIFS/4.3+OpenIFS%3A+Horizontal+Resolution+and+Configurations">(info)</a>: <select id="grid_hres_40r1" name="grid_hres_40r1" class="dropdown">
+        <option value="0">Select</option>
+        <option value="Tl159">Tl159</option>
+        <option value="Tl255">Tl255</option>
+        </select><br><br>   
+    </div>
 
-        function showFields(groupId, enabled) {
-            const group = document.getElementById(groupId);
-            group.hidden = !enabled;
-            group.querySelectorAll('input, select').forEach(function (field) {
-                field.disabled = !enabled;
-                field.required = enabled;
-                if (!enabled) field.value = '';
+    <div id="gridInfo43r3" name="gridInfo43r3" style="display: none;">
+    Horizontal resolution and Grid <a href="https://confluence.ecmwf.int/display/OIFS/4.3+OpenIFS%3A+Horizontal+Resolution+and+Configurations">(info)</a>: <select id="grid_hres_43r3" name="grid_hres_43r3" class="dropdown">
+        <option value="0">Select</option>
+        <option value="Tl159">Tl159</option>
+        <option value="Tl255">Tl255</option>
+        <option value="Tl319">Tl319</option>
+        <option value="Tl399">Tl399</option>
+        <option value="Tco95">Tco95</option>
+        <option value="Tco159">Tco159</option>
+        <option value="Tco199">Tco199</option>
+        </select><br><br>
+    </div>
+    
+    <div id="ic_ancil_descriptions" name="ic_ancil_descriptions" style="display: none;">
+    <p>Note initial files are uploaded as a .tgz file with the directory structure [exptid]/[start date time]/[analysis perturbation number]/[files].<br>Multiple dates and analysis numbers can be included in a single upload tarball.  The analysis perturbation number directory can be ommited if only one exists.</p>
+    ECMWF experiment id: <input type="text" name="exptid" maxlength="4" size="4">
+    Starting analysis: <select id="starting_analysis" name="starting_analysis" class="dropdown">
+                <option value="0">Select</option>
+                <option value="Operational">Operational</option>
+                <option value="ERA5">ERA5</option>
+                <option value="ERA-Interim">ERA-Interim</option>
+                <option value="Other">Other</option>
+                </select><br><br>
+    </div>
+    
+    Case study scenario / Description: <p> <textarea name="file_desc" rows="3" cols="80"></textarea><br><br>
+
+    <div id="filelist">Your browser doesn't have Flash, Silverlight or HTML5 support.</div>
+    <br />
+ 
+    <br />
+    <pre id="console"></pre>
+
+    <div id="container">
+    Upload file here: <input id="pickfiles" type="file" href="javascript:;"><br><br>
+    <input id="uploadfiles" type="submit" href="javascript:;">
+    </div>
+
+    <input type="hidden" id="fileName" name="fileName" value="">
+<form>
+
+<script type="text/javascript">
+// Custom example logic
+ 
+var uploader = new plupload.Uploader({
+    runtimes : 'html5,flash,silverlight,html4',
+     
+    browse_button : 'pickfiles', // you can pass in id...
+    container: document.getElementById('container'), // ... or DOM Element itself
+  //  multi_selection: false,     
+    url : "../plupload_handler.php",
+    chunk_size : '100mb',
+
+    filters : {
+        max_file_size : '5gb',
+
+        mime_types: [
+            {title : "Zip files", extensions : "zip,tgz"},
+        {title : "Namelist files", extensions : "nml"}
+        ]
+    },
+ 
+    // Flash settings
+    flash_swf_url : '../js/Moxie.swf',
+ 
+    // Silverlight settings
+    silverlight_xap_url : '../js/Moxie.xap',
+     
+ 
+    init: {
+        PostInit: function() {
+            document.getElementById('filelist').innerHTML = '';
+ 
+            document.getElementById('uploadfiles').onclick = function() {
+                uploader.start();
+                return false;
+            };
+        },
+ 
+        FilesAdded: function(up, files) {
+            plupload.each(files, function(file) {
+        document.getElementById('fileName').value = file.name ;
+                document.getElementById('filelist').innerHTML += '<div id="' + file.id + '">' + file.name + ' (' + plupload.formatSize(file.size) + ') <b></b></div>';
             });
+        },
+ 
+        UploadProgress: function(up, file) {
+            document.getElementById(file.id).getElementsByTagName('b')[0].innerHTML = '<span>' + file.percent + "%</span>";
+        },
+
+    FileUploaded: function(up, file) {
+    },
+    
+    ChunkUploaded: function(up, file, info) {
+    },
+
+    UploadComplete: function() {
+        document.getElementById('upload_form').submit();
+    },
+        Error: function(up, err) {
+            document.getElementById('console').innerHTML += "\nError #" + err.code + ": " + err.message;
         }
-        function updateFields() {
-            const grid = type.value === 'ifsdata' || type.value === 'climate_data';
-            showFields('subType', type.value === 'ifsdata');
-            showFields('ic_ancil_descriptions', type.value === 'ic_ancil');
-            showFields('gridInfo43r3', grid && version.value === '43r3');
-        }
-        type.addEventListener('change', updateFields);
-        version.addEventListener('change', updateFields);
-        updateFields();
-        if (typeof plupload === 'undefined') {
-            status.textContent = 'The upload library could not be loaded. Contact the administrator.';
-            return;
-        }
-        const uploader = new plupload.Uploader({
-            runtimes: 'html5',
-            browse_button: 'pickfiles',
-            container: document.getElementById('container'),
-            url: 'oifs_upload_handler.php',
-            chunk_size: '100mb',
-            multi_selection: false,
-            max_retries: 2,
-            filters: {
-                max_file_size: '5gb',
-                mime_types: [{title: 'Ancillary files', extensions: 'zip,tgz,nml'}]
-            },
-            init: {
-                PostInit: function () {
-                    picker.disabled = false;
-                },
-                FilesAdded: function (up, files) {
-                    if (busy) {
-                        files.forEach(function (file) { up.removeFile(file); });
-                        return;
-                    }
-                    const selected = files[files.length - 1];
-                    up.files.slice().forEach(function (file) {
-                        if (file.id !== selected.id) up.removeFile(file);
-                    });
-                    document.getElementById('fileName').value = selected.name;
-                    list.textContent = selected.name + ' (' + plupload.formatSize(selected.size) + ')';
-                    status.textContent = '';
-                    button.disabled = false;
-                },
-                BeforeUpload: function (up, file) {
-                    const params = {phase: 'chunk', upload_size: String(file.size)};
-                    ['upload_id', 'upload_expires', 'upload_token', 'tnow', 'ttok'].forEach(function (name) {
-                        params[name] = form.elements.namedItem(name).value;
-                    });
-                    up.setOption('multipart_params', params);
-                },
-                UploadProgress: function (up, file) {
-                    status.textContent = 'Uploading: ' + file.percent + '%';
-                },
-                FileUploaded: function (up, file, info) {
-                    try {
-                        const response = JSON.parse(info.response);
-                        received = !response.error && response.result
-                            && response.result.complete === true
-                            && response.result.upload_id === form.elements.namedItem('upload_id').value;
-                    } catch (error) {
-                        received = false;
-                    }
-                    if (!received) {
-                        failed = true;
-                        status.textContent = 'The server did not confirm a complete upload. Reload the form to try again.';
-                    }
-                },
-                UploadComplete: function (up) {
-                    if (failed || !received || up.files.length !== 1
-                        || up.files[0].status !== plupload.DONE) return;
-                    completed = true;
-                    status.textContent = 'Upload complete. Processing the ancillary file…';
-                    form.querySelectorAll('[data-upload-enabled]').forEach(function (field) {
-                        field.disabled = false;
-                    });
-                    // Native submission bypasses this form's upload-start listener.
-                    HTMLFormElement.prototype.submit.call(form);
-                },
-                Error: function (up, error) {
-                    status.textContent = 'Upload error: ' + error.message
-                        + (busy ? ' Reload the form before trying again.' : '');
-                    if (busy) {
-                        failed = true;
-                        up.stop();
-                    }
-                }
-            }
-        });
-        form.addEventListener('submit', function (event) {
-            event.preventDefault();
-            if (busy || !form.reportValidity() || uploader.files.length !== 1) return;
-            const file = uploader.files[0];
-            const extension = type.value === 'ic_ancil' ? 'tgz'
-                : (type.value === 'fullpos_namelist' ? 'nml' : 'zip');
-            if (!/^[A-Za-z0-9][A-Za-z0-9._ -]*\.(tgz|zip|nml)$/i.test(file.name)
-                || file.name.length > 200 || file.size < 1
-                || file.name.split('.').pop().toLowerCase() !== extension) {
-                status.textContent = 'Choose a nonempty .' + extension
-                    + ' file with a simple filename (letters, numbers, spaces, dots, underscores or hyphens).';
-                return;
-            }
-            busy = true;
-            failed = false;
-            received = false;
-            picker.disabled = true;
-            button.disabled = true;
-            uploader.disableBrowse(true);
-            // Freeze metadata during upload, then restore it for the final POST.
-            form.querySelectorAll('input:not([type="hidden"]), select, textarea').forEach(function (field) {
-                if (!field.disabled) {
-                    field.setAttribute('data-upload-enabled', 'true');
-                    field.disabled = true;
-                }
-            });
-            uploader.start();
-        });
-        window.addEventListener('beforeunload', function (event) {
-            if (busy && !completed) {
-                event.preventDefault();
-                event.returnValue = '';
-            }
-        });
-        uploader.init();
-    });
-    </script>
-</body>
-</html>
+    }
+});
+
+uploader.init();
+
+</script>
+

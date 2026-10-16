@@ -1,26 +1,59 @@
 <?php
-$project_path="/storage/www/cpdnboinc_dev/";
-$xml=simplexml_load_file($project_path."ancil_batch_user_config.xml") or die("Error: Cannot create object");
+
+// Force PHP to show structural errors
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
+// =========================================================================
+// 1. SERVER-SIDE PATHS (PHP) - Always use explicit absolute paths
+// =========================================================================
+define('PROJECT_PATH', realpath(__DIR__ . '/../../..') . '/');   // i.e. /storage/www/cpdnboinc
+define('CPDN_LOCAL',   __DIR__ );
+define('BOINC_INC',    PROJECT_PATH . 'html/inc/');
+define('LOCAL_INC',    __DIR__ . '/include/');
+
+// =========================================================================
+// 2. CLIENT-SIDE PATHS (HTML) - *MUST* always start with "/" to target the domain root
+//    e.g. src="/img/mylogo.png"  and not  src="../img/mylogo.png"
+//    Where "/img/mylogo.png"   means  main.cpdn.org/img/mylogo.png
+// =========================================================================
+
+
+//  Now switch to boinc's html root so all the includes load correctly
+chdir(CPDN_LOCAL . '/..');
+
+// Load BOINC using its absolute server location
+require_once(BOINC_INC . 'util.inc');
+
+// Load custom local classes explicitly
+require_once(LOCAL_INC . 'html_table.class.php');
+
+// Load cpdn custom config XML
+$xml = simplexml_load_file(PROJECT_PATH . "ancil_batch_user_config.xml")
+    or die("Error: Configuration file missing.");
+
+//  Set the global include paths, including ours.
+set_include_path(
+                get_include_path() .
+                PATH_SEPARATOR . BOINC_INC .
+                PATH_SEPARATOR . CPDN_LOCAL );
+
+
+
 $host= $xml->ancil_db_host;
 $dbname=$xml->ancil_db_name;
 $boinc_dbname=$xml->ancil_boinc_db_name;
 $user= $xml->ancil_user;
 $pass= $xml->ancil_passwd;
 
-# include the table tag generatora 
-require_once('includes/html_table.class.php');
-
-require_once("../inc/util.inc");
-
-//page_head("OpenIFS Ancil Search");
-
 
 echo <<<EOH
 <html>
 <head>
 <META NAME="ROBOTS" CONTENT="NOINDEV, NOFOLLOW">
-<script type="text/javascript" src="jquery/jquery-latest.js"></script>
-<script type="text/javascript" src="jquery/jquery.tablesorter.js"></script>
+<script type="text/javascript" src="/jquery/jquery-latest.js"></script>
+<script type="text/javascript" src="/jquery/jquery.tablesorter.js"></script>
 <script type="text/javascript">
 			$(document).ready(function() {
 				$("#myTable").tablesorter();
@@ -40,12 +73,12 @@ EOH;
 
 echo '<div class="wrap" style="width:100%">';
 echo '<div style="width:100%">';
-echo '<img src="img/OIFS_Home_logo.png" alt="OpenIFS@home" style="width:200px">';
-echo '<img src="img/CPDN_abbrv_logo.png" alt="CPDN" style="width:250px; float:right;">';
+echo '<img src="/img/OIFS_Home_logo.png" alt="OpenIFS@home" style="width:200px">';
+echo '<img src="/img/CPDN_abbrv_logo.png" alt="CPDN" style="width:250px; float:right;">';
 echo '</div>';
 echo '<div style="clear: both;"></div>';
 echo '</div>';
-echo '<hr>';
+echo '<hr><h1>OpenIFS file search</h1><br>';
 
 
 ?>
@@ -84,7 +117,7 @@ if(isset($_POST['submit'])) {
     $by_exptid = $_POST['by_exptid'];
     //Do real escaping here
 
-    $query = "SELECT CONCAT('<a href=https://dev.cpdn.org/oifs_ancil_details.php?file_name=',file_name,'>',file_name,'</a>') as 'File name', date(create_time) as 'Creation date', created_by as 'Created by', description as 'Description', ancil_type as 'Type', IF(STRCMP(ancil_sub_type,'0') = 0,'',ancil_sub_type) as 'Sub type', model_version_number as 'Model version', exptid as 'Exptid', starting_analysis as 'Starting analysis', analysis_perturbation_number as 'Analysis number', start_date as 'Start date', end_date as 'End date', CONCAT(COALESCE(grid_type,''),COALESCE(spectral_horizontal_resolution,''),COALESCE(gridpoint_horizontal_resolution,'')) as 'Horizontal resolution', vertical_resolution as 'Vertical resolution', batches_used as 'Batches used'  FROM ".$dbname.".oifs_ancil_files";
+    $query = "SELECT CONCAT('<a href=http://dev.cpdn.org/oifs_ancil_details.php?file_name=',file_name,'>',file_name,'</a>') as 'File name', date(create_time) as 'Creation date', created_by as 'Created by', description as 'Description', ancil_type as 'Type', IF(STRCMP(ancil_sub_type,'0') = 0,'',ancil_sub_type) as 'Sub type', model_version_number as 'Model version', exptid as 'Exptid', starting_analysis as 'Starting analysis', analysis_perturbation_number as 'Analysis number', start_date as 'Start date', end_date as 'End date', CONCAT(COALESCE(grid_type,''),COALESCE(spectral_horizontal_resolution,''),COALESCE(gridpoint_horizontal_resolution,'')) as 'Horizontal resolution', vertical_resolution as 'Vertical resolution', batches_used as 'Batches used'  FROM ".$dbname.".oifs_ancil_files";
     $conditions = array();
 
     if(! empty($by_name)) {
@@ -181,7 +214,7 @@ function make_table($db_result){
         #$tbl->addCaption($query, 'cap', array('id'=> 'tblCap') );
 
         $tbl->make_table($result);
-        $tbl->make_script('script',' ',array('src' => "jquery/jquery-latest.js"));
+        $tbl->make_script('script',' ',array('src' => "/jquery/jquery-latest.js"));
         echo $tbl->display_script();
         echo $tbl->display();
     }
