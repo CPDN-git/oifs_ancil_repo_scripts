@@ -1,6 +1,6 @@
 <?php
 
-// Force PHP to show structural errors
+// Force PHP to show errors
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
@@ -35,9 +35,10 @@ $xml = simplexml_load_file(PROJECT_PATH . "ancil_batch_user_config.xml")
 
 //  Set the global include paths, including ours.
 set_include_path(
-                get_include_path() .
-                PATH_SEPARATOR . BOINC_INC .
-                PATH_SEPARATOR . CPDN_LOCAL );
+    get_include_path() .
+    PATH_SEPARATOR . BOINC_INC .
+    PATH_SEPARATOR . CPDN_LOCAL
+);
 
 
 
@@ -47,26 +48,61 @@ $boinc_dbname=$xml->ancil_boinc_db_name;
 $user= $xml->ancil_user;
 $pass= $xml->ancil_passwd;
 
+class Auto_Table extends HTML_table {
+    public function make_table($statement) {
+        $metadata = $statement->result_metadata()
+            or die('Error reading search columns: ' . $statement->error);
+        $fields = $metadata->fetch_fields();
+
+        $this->addTSection('thead');
+        $this->addRow();
+        // Keep the final "Batches used" column hidden; it controls shading.
+        foreach (array_slice($fields, 0, -1) as $field) {
+            $this->addCell(
+                htmlspecialchars($field->name, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'),
+                '',
+                'header'
+            );
+        }
+
+        // Bind result columns directly, without requiring mysqli get_result().
+        $row = array_fill(0, count($fields), null);
+        $statement->bind_result(...$row)
+            or die('Error binding search results: ' . $statement->error);
+
+        $this->addTSection('tbody');
+        while ($statement->fetch()) {
+            $this->addRow();
+            $attrs = array(
+                'class' => htmlspecialchars((string)$row[4], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')
+            );
+            if (end($row) != 0) {
+                $attrs['bgcolor'] = 'F5F5F5';
+            }
+            foreach (array_slice($row, 0, -1) as $index => $cell) {
+                $content = htmlspecialchars((string)$cell, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+                if ($index === 0) {
+                    $details_url = 'https://main.cpdn.org/cpdn/oifs_ancil_details.php?file_name='
+                        . rawurlencode((string)$cell);
+                    $content = '<a href="'
+                        . htmlspecialchars($details_url, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')
+                        . '">' . $content . '</a>';
+                }
+                $this->addCell($content, '', 'data', $attrs);
+            }
+        }
+        $metadata->free();
+    }
+}
 
 echo <<<EOH
+<!DOCTYPE html>
 <html>
 <head>
-<META NAME="ROBOTS" CONTENT="NOINDEV, NOFOLLOW">
-<script type="text/javascript" src="/jquery/jquery-latest.js"></script>
-<script type="text/javascript" src="/jquery/jquery.tablesorter.js"></script>
-<script type="text/javascript">
-			$(document).ready(function() {
-				$("#myTable").tablesorter();
-			});
-		</script>
-<style type="text/css">
-			#sortedtable thead th {
-				color: #00f;
-				font-weight: bold;
-				text-decoration: underline;
-			}
-		</style>
-<link rel="stylesheet" href="cpdn.css">
+<meta charset="utf-8">
+<title>OpenIFS File Search</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="stylesheet" href="/cpdn.css">
 </head>
 <body>
 EOH;
@@ -79,147 +115,88 @@ echo '</div>';
 echo '<div style="clear: both;"></div>';
 echo '</div>';
 echo '<hr><h1>OpenIFS file search</h1><br>';
-
-
 ?>
-    <form action="" method="post">
+<form action="/cpdn/oifs_search.php" method="post">
     <table width="100%" border="0" style="border:none;">
-      <tr class=nohover>
-        <td><label>File Name:<br></label><input type="text" name="by_name" /></td>
-        <td><label>Case Study/Description:<br></label><input type="text" name="by_desc" /></td>
-	    <td><label>Type:<br></label><select name="by_type">
+        <tr class="nohover">
+            <td><label>File Name:<br></label><input type="text" name="by_name" /></td>
+            <td><label>Case Study/Description:<br></label><input type="text" name="by_desc" /></td>
+            <td><label>Type:<br></label><select name="by_type">
                 <option value="">Select...</option>
                 <option value="ic_ancil">initial files</option>
                 <option value="ifsdata">ifsdata</option>
                 <option value="climate_data">climate_data</option>
                 <option value="fullpos_namelist">FullPos namelist</option>
-                </select></td>
-	    <td><label>Sub type:<br></label><select name="by_subtype">
+            </select></td>
+            <td><label>Sub type:<br></label><select name="by_subtype">
                 <option value="">Select...</option>
                 <option value="GHG_files">GHG files</option>
                 <option value="other_radiation_files">Other radiation files</option>
                 <option value="SO4_files">SO4 files</option>
-                </select></td>
-        <td><label>Start Date:<br></label><input type="text" name="by_start" /></td>
-        <td><label>ECMWF exptid:<br></label><input type="text" name="by_exptid" /></td>
-        <td><input class="button" type="submit" name="submit" value="Search" /></td>
-      </tr>
+            </select></td>
+            <td><label>Start Date:<br></label><input type="text" name="by_start" /></td>
+            <td><label>ECMWF exptid:<br></label><input type="text" name="by_exptid" /></td>
+            <td><input class="button" type="submit" name="submit" value="Search" /></td>
+        </tr>
     </table>
-    </form>
+</form>
 <?php
-
-if(isset($_POST['submit'])) {
-    $by_name = $_POST['by_name'];
-    $by_desc = $_POST['by_desc'];
-    $by_type = $_POST['by_type'];
-    $by_subtype = $_POST['by_subtype'];
-    $by_start = $_POST['by_start'];
-    $by_exptid = $_POST['by_exptid'];
-    //Do real escaping here
-
-    $query = "SELECT CONCAT('<a href=http://dev.cpdn.org/oifs_ancil_details.php?file_name=',file_name,'>',file_name,'</a>') as 'File name', date(create_time) as 'Creation date', created_by as 'Created by', description as 'Description', ancil_type as 'Type', IF(STRCMP(ancil_sub_type,'0') = 0,'',ancil_sub_type) as 'Sub type', model_version_number as 'Model version', exptid as 'Exptid', starting_analysis as 'Starting analysis', analysis_perturbation_number as 'Analysis number', start_date as 'Start date', end_date as 'End date', CONCAT(COALESCE(grid_type,''),COALESCE(spectral_horizontal_resolution,''),COALESCE(gridpoint_horizontal_resolution,'')) as 'Horizontal resolution', vertical_resolution as 'Vertical resolution', batches_used as 'Batches used'  FROM ".$dbname.".oifs_ancil_files";
+if (isset($_POST['submit'])) {
+    $query = "SELECT file_name as 'File name', date(create_time) as 'Creation date', created_by as 'Created by', description as 'Description', ancil_type as 'Type', IF(STRCMP(ancil_sub_type,'0') = 0,'',ancil_sub_type) as 'Sub type', model_version_number as 'Model version', exptid as 'Exptid', starting_analysis as 'Starting analysis', analysis_perturbation_number as 'Analysis number', start_date as 'Start date', end_date as 'End date', CONCAT(COALESCE(grid_type,''),COALESCE(spectral_horizontal_resolution,''),COALESCE(gridpoint_horizontal_resolution,'')) as 'Horizontal resolution', vertical_resolution as 'Vertical resolution', batches_used as 'Batches used' FROM " . $dbname . '.oifs_ancil_files';
     $conditions = array();
-
-    if(! empty($by_name)) {
-      $conditions[] = "file_name LIKE '%$by_name%'";
-    }
-    if(! empty($by_desc)) {
-      $conditions[] = "description LIKE '%$by_desc%'";
-    }
-    if(! empty($by_type)) {
-      $conditions[] = "ancil_type='$by_type'";
-    }
-    if(! empty($by_subtype)) {
-      $conditions[] = "ancil_sub_type='$by_subtype'";
-    }
-    if(! empty($by_start)) {
-      $conditions[] = "start_date='$by_start'";
-    }
-    if(! empty($by_exptid)) {
-      $conditions[] = "exptid='$by_exptid'";
+    $parameters = array();
+    // SQL column names and operators come only from this fixed mapping.
+    $filters = array(
+        'by_name' => array('file_name', 'LIKE'),
+        'by_desc' => array('description', 'LIKE'),
+        'by_type' => array('ancil_type', '='),
+        'by_subtype' => array('ancil_sub_type', '='),
+        'by_start' => array('start_date', '='),
+        'by_exptid' => array('exptid', '=')
+    );
+    foreach ($filters as $input => $filter) {
+        $value = $_POST[$input] ?? '';
+        if (!is_string($value)) {
+            die('Invalid search value.');
+        }
+        if ($value !== '') {
+            $conditions[] = $filter[0] . ' ' . $filter[1] . ' ?';
+            $parameters[] = $filter[1] === 'LIKE' ? '%' . $value . '%' : $value;
+        }
     }
     $sql = $query;
     if (count($conditions) > 0) {
-      $sql .= " WHERE " . implode(' AND ', $conditions);
+        $sql .= ' WHERE ' . implode(' AND ', $conditions);
     }
-    $tablesorter_class='cpdnTable';
+    $table_class = 'cpdnTable';
 
-    $link = mysqli_connect($host,$user,$pass,$dbname) or die("Error " . mysqli_error($link));
-    $result = $link->query($sql) or die("Error in the consult.." . mysqli_error($link));
+    $link = mysqli_connect($host, $user, $pass, $dbname)
+        or die('Error ' . mysqli_connect_error());
+    $link->set_charset('utf8mb4')
+        or die('Error setting search encoding: ' . mysqli_error($link));
+    $statement = $link->prepare($sql)
+        or die('Error preparing search: ' . mysqli_error($link));
+    if (count($parameters) > 0) {
+        $types = str_repeat('s', count($parameters));
+        $statement->bind_param($types, ...$parameters)
+            or die('Error binding search: ' . $statement->error);
+    }
+    $statement->execute()
+        or die('Error executing search: ' . $statement->error);
+    $statement->store_result()
+        or die('Error storing search results: ' . $statement->error);
 
-class Auto_Table extends HTML_table	{
-	private $db_result = NULL;
-	private $script_tags =array();
-	private $style_tags =array();
-	
-function make_script($script='script', $content='', $attrs=array()){
-	array_push ($this->script_tags, $this->make_tag($script, $content, $attrs));
-	
-	}
-
-function display_script(){
-	$mystr='';
-	foreach ($this->script_tags as $tag){
-		$mystr.= "$tag\n";
-		}
-	return $mystr;
-	}
-
-function make_css($tag){
-	}
-
-function make_tag($tag, $content='', $attrs=array()){
-	# void tags have no content, and must be closed with />
-	$html_void= array("area", "base", "br", "col", "command", "embed", "hr", "img", "input", "keygen", "link", "meta", "param", "source", "track", "wbr");
-	$mytag =''; 
-	$mytag ='<'.$tag;
-	if (in_array($tag, $html_void)){
-		$mytag .= ' />';
-		}
-	else {
-		$mytag .= ">$content</$tag>";
-		}
-	return $mytag;
-	}
-	
-	
-function make_table($db_result){
-	$this->db_result = $db_result;
-	$this->addTSection('thead');
-	$this->addRow();
-	$finfo = $this->db_result->fetch_fields();
-		 foreach (array_slice($finfo,0,-1) as $f){
-			$this->addCell($f->name, '', 'header');
-			}
-	$this->addTSection('tbody');
-	while ($row = $db_result->fetch_row()) {
-		$this->addRow();
-		foreach (array_slice($row,0,-1) as $cell){
-			if (end($row) == 0) {
-				$this->addCell($cell,'','data',array('class'=>$row[4]));
-			}
-			else {
-				$this->addCell($cell,'','data',array('class'=>$row[4],'bgcolor'=>'F5F5F5'));
-			}
-			}
-		}
-	}
-}
-
-    $row_cnt = $result->num_rows;
-    if ($row_cnt > 0)
-    {
-
-        $tbl = new Auto_Table('myTable', 'tablesorter');
-        #$tbl->addCaption($query, 'cap', array('id'=> 'tblCap') );
-
-        $tbl->make_table($result);
-        $tbl->make_script('script',' ',array('src' => "/jquery/jquery-latest.js"));
-        echo $tbl->display_script();
+    if ($statement->num_rows > 0) {
+        $tbl = new Auto_Table('SearchResultsTable', $table_class);
+        $tbl->make_table($statement);
         echo $tbl->display();
+    } else {
+        echo '<p>No matching files found.</p>';
     }
-    mysqli_free_result($result);
-    mysqli_close ($link);
-
+    $statement->free_result();
+    $statement->close();
+    mysqli_close($link);
 }
 ?>
+</body>
+</html>

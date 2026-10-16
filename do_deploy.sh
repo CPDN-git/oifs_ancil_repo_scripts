@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 #
-# Deploy ancillary repository webpages to user space (html/user).
+# Deploy ancillary repository webpages to user space (html/user/cpdn).
 #
 
 set -e
 
-DEPLOYDIR="/storage/www/cpdnboinc/html/user"
+DEPLOYDIR="/storage/www/cpdnboinc/html/user/cpdn"
 REPODIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
 deploy_file() {
@@ -56,6 +56,7 @@ echo "Deploying OIFS ancillary repository webpages into position on live server.
 deploy_files=(
     oifs_upload_form.php
     oifs_upload_handler.php
+    oifs_search.php
 )
 
 for file in "${deploy_files[@]}"
