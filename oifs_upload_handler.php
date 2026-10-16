@@ -1,85 +1,181 @@
 <?php
 
-require_once("../inc/util.inc");
-require_once("../inc/user.inc");
-require_once("../inc/boinc_db.inc");
-require_once("../inc/oifs_uploaders.inc");
+//  OpenIFS ancillary file upload handler
+
+// Force PHP to show errors
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
+// =========================================================================
+// 1. SERVER-SIDE PATHS (PHP) - Always use explicit absolute paths
+// =========================================================================
+define('PROJECT_PATH', realpath(__DIR__ . '/../../..') . '/');   // i.e. /storage/www/cpdnboinc
+define('CPDN_LOCAL',   __DIR__ );
+define('BOINC_INC',    PROJECT_PATH . 'html/inc/');
+define('LOCAL_INC',    __DIR__ . '/include/');
+
+// =========================================================================
+// 2. CLIENT-SIDE PATHS (HTML) - *MUST* always start with "/" to target the domain root
+//    e.g. src="/img/mylogo.png"  and not  src="../img/mylogo.png"
+//    Where "/img/mylogo.png"   means  main.cpdn.org/img/mylogo.png
+// =========================================================================
 
 
-echo <<<EOH
+//  Now switch to boinc's html root so all the includes load correctly
+chdir(CPDN_LOCAL . '/..');
+
+set_include_path(
+    get_include_path() .
+    PATH_SEPARATOR . BOINC_INC .
+    PATH_SEPARATOR . CPDN_LOCAL
+);
+
+
+require_once(BOINC_INC . 'util.inc');
+require_once(BOINC_INC . 'user.inc');
+require_once(BOINC_INC . 'boinc_db.inc');
+require_once(BOINC_INC . 'oifs_uploaders.inc');
+
+// BOINC's default login redirect drops the directory from the return URL.
+$user = get_logged_in_user(false);
+if (!$user) {
+    header('Location: /login_form.php?next_url=' . rawurlencode('cpdn/oifs_upload_form.php'));
+    exit;
+}
+if (!isset($allowed_uploaders) || !is_array($allowed_uploaders)) {
+    http_response_code(500);
+    exit('Uploader access configuration is unavailable.');
+}
+if (!in_array($user->email_addr, $allowed_uploaders, true)) {
+    http_response_code(403);
+    exit('You are not allowed to visit this page.');
+}
+
+// Plupload has already staged the file; this request supplies its metadata.
+function upload_response($status, $message, $output = '')
+{
+    http_response_code($status);
+    header('Content-Type: text/html; charset=utf-8');
+    $message_html = htmlspecialchars($message, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    $output_html = htmlspecialchars($output, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    echo <<<EOH
+<!DOCTYPE html>
 <html>
 <head>
-<title>OpenIFS@home Ancil upload form</title>
-<script type="text/javascript" src="jquery/jquery-latest.js"></script>
-<script type="text/javascript" src="jquery/jquery.tablesorter.js"></script>
-<script type="text/javascript">
-                        $(document).ready(function() {
-                                $("#myTable").tablesorter();
-                        });
-                </script>
-<style type="text/css">
-                        #sortedtable thead th {
-                                color: #00f;
-                                font-weight: bold;
-                                text-decoration: underline;
-                        }
-                </style>
-<link rel="stylesheet" href="cpdn.css">
+<meta charset="utf-8">
+<meta name="robots" content="noindex, nofollow">
+<title>OpenIFS@home Ancillary upload result</title>
+<link rel="stylesheet" href="/cpdn.css">
 </head>
 <body>
+<div class="wrap" style="width:100%">
+    <img src="/img/OIFS_Home_logo.png" alt="OpenIFS@home" style="width:200px">
+    <img src="/img/CPDN_abbrv_logo.png" alt="CPDN" style="width:250px; float:right;">
+    <div style="clear:both;"></div>
+</div>
+<hr>
+<h1>Ancillary upload result</h1>
+<p>$message_html</p>
 EOH;
-
-echo '<div class="wrap" style="width:100%">';
-echo '<div style="width:100%">';
-echo '<img src="img/OIFS_Home_logo.png" alt="OpenIFS@home" style="width:200px">';
-echo '<img src="img/CPDN_abbrv_logo.png" alt="CPDN" style="width:250px; float:right;">';
-echo '</div>';
-echo '<div style="clear: both;"></div>';
-echo '</div>';
-echo '<hr>';
-
-$user = get_logged_in_user();
-
-$python_env='/home/boinc/miniconda3/envs/py3new/bin/python';
-$script_path='/home/boinc/cpdnboinc/oifs_ancil_repo_scripts/';
-$tmp_dir='/storage/www/cpdnboinc/tmp_ancil_upload/';
-
-if (in_array($user->email_addr,$allowed_uploaders)){
-        echo "$user->name is logged in<br>";
-    echo 'Created by '.$_POST["created_by"].'<br>';
-        echo 'Form was submitted, here are the form values: <pre>';
-        print_r($_POST);
-        echo "</pre>";
-
-        $phpFileUploadErrors = array(
-                0 => 'There is no error, the file uploaded with success',
-                1 => 'The uploaded file exceeds the upload_max_filesize directive in php.ini',
-                2 => 'The uploaded file exceeds the MAX_FILE_SIZE directive that was specified in the HTML form',
-                3 => 'The uploaded file was only partially uploaded',
-                4 => 'No file was uploaded',
-                6 => 'Missing a temporary folder',
-                7 => 'Failed to write file to disk.',
-                8 => 'A PHP extension stopped the file upload.'
-        );
-
-        if ($_POST['file_desc']=="" or $_POST['created_by']=="" or $_POST['model_version']==0){
-                $upload_ok=FALSE;
-                die("Error, Please make sure all information is entered.<br>");
-        }
-    $fileName=$_POST['fileName'];
-
-    echo '<p>Uploaded file: '.$fileName.'</p>';
-    $md5_value=md5_file($tmp_dir.$fileName);
-    echo '<p style=color:green;>md5 checksum: '.$md5_value.'</p>';
-
-    $model_ver=$_POST['model_version'];
-    $grid_hres=$_POST['grid_hres_'.$model_ver];
-
-    $r = escapeshellcmd( $python_env.' '.$script_path.'oifs_file_upload_handler.py "'.$_POST['created_by'].'"  "'.$user->name.'" "'.$_POST['model_version'].'" "'.$_POST['exptid'].'" "'.$_POST['starting_analysis'].'" "'.$_POST['ancil_type'].'" "'.$_POST['sub_type'].'" "'.$grid_hres.'" "'.$_POST['file_desc'].'" "'.$fileName.'"');
-    $output = shell_exec($r.' 2>&1');
-    echo "<pre>$output</pre>";
+    if ($output !== '') {
+        echo '<pre>' . $output_html . '</pre>';
+    }
+    echo '<p><a href="/cpdn/oifs_upload_form.php">Return to the upload form</a></p>';
+    echo '</body></html>';
+    exit;
 }
-else {
-        die("You are not allowed to visit this page");
-        } ?>
 
+function upload_field($name)
+{
+    if (!isset($_POST[$name]) || !is_string($_POST[$name]) || strpos($_POST[$name], "\0") !== false) {
+        upload_response(400, 'Missing or invalid form field: ' . $name . '. Please submit the upload form again.');
+    }
+    return $_POST[$name];
+}
+
+if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+    header('Allow: POST');
+    upload_response(405, 'Please submit an upload using the upload form.');
+}
+
+$created_by = upload_field('created_by');
+$file_desc = upload_field('file_desc');
+$model_ver = upload_field('model_version');
+$ancil_type = upload_field('ancil_type');
+$sub_type = upload_field('sub_type');
+$exptid = upload_field('exptid');
+$starting_analysis = upload_field('starting_analysis');
+$file_name = upload_field('fileName');
+
+$grids = array(
+    '40r1' => array('0', 'Tl159', 'Tl255'),
+    '43r3' => array('0', 'Tl159', 'Tl255', 'Tl319', 'Tl399', 'Tco95', 'Tco159', 'Tco199')
+);
+if (trim($created_by) === '' || trim($file_desc) === '' || !isset($grids[$model_ver])) {
+    upload_response(400, 'Please provide a creator, description and supported model version.');
+}
+if (!in_array($ancil_type, array('ic_ancil', 'ifsdata', 'climate_data', 'fullpos_namelist'), true)) {
+    upload_response(400, 'Please select a supported ancillary file type.');
+}
+if (!in_array($sub_type, array('0', 'GHG_files', 'other_radiation_files', 'SO4_files'), true) ||
+    !in_array($starting_analysis, array('0', 'Operational', 'ERA5', 'ERA-Interim', 'Other'), true)) {
+    upload_response(400, 'Invalid ancillary subtype or starting analysis.');
+}
+$grid_hres = upload_field('grid_hres_' . $model_ver);
+if (!in_array($grid_hres, $grids[$model_ver], true)) {
+    upload_response(400, 'Invalid grid selection for this model version.');
+}
+if (in_array($ancil_type, array('ifsdata', 'climate_data'), true) && $grid_hres === '0') {
+    upload_response(400, 'Please select the horizontal resolution and grid.');
+}
+// The backend uses exptid as a directory name when unpacking initial files.
+if ($ancil_type === 'ic_ancil' && !preg_match('/\A[A-Za-z0-9]{4}\z/', $exptid)) {
+    upload_response(400, 'Initial files require a four-character alphanumeric experiment ID.');
+}
+if ($file_name === '' || $file_name === '.' || $file_name === '..' ||
+    strpos($file_name, '/') !== false || strpos($file_name, '\\') !== false ||
+    substr($file_name, -5) === '.part') {
+    upload_response(400, 'Invalid uploaded filename.');
+}
+
+// Retain the configured server Python environment and backend location.
+$python_env = '/home/boinc/miniconda3/envs/py3new/bin/python';
+$script_file = '/home/boinc/cpdnboinc/oifs_ancil_repo_scripts/oifs_file_upload_handler.py';
+$tmp_dir = realpath(PROJECT_PATH . 'tmp_ancil_upload');
+if ($tmp_dir === false || !is_dir($tmp_dir) || !is_readable($tmp_dir)) {
+    upload_response(500, 'The upload staging directory is unavailable.');
+}
+$staged_file = $tmp_dir . DIRECTORY_SEPARATOR . $file_name;
+$resolved_file = realpath($staged_file);
+if ($resolved_file === false || dirname($resolved_file) !== $tmp_dir ||
+    is_link($staged_file) || !is_file($resolved_file) || !is_readable($resolved_file)) {
+    upload_response(400, 'The completed uploaded file is unavailable. Please upload the file again.');
+}
+$md5_value = md5_file($resolved_file);
+if ($md5_value === false) {
+    upload_response(500, 'Unable to calculate the uploaded file checksum.');
+}
+if (!is_executable($python_env) || !is_file($script_file) || !is_readable($script_file) || !is_callable('exec')) {
+    upload_response(500, 'The upload processor is unavailable. Please contact the server administrator.');
+}
+
+// Quote each argument separately, preserving the backend's positional interface.
+$arguments = array(
+    $python_env, $script_file, $created_by, $user->name, $model_ver,
+    $exptid, $starting_analysis, $ancil_type, $sub_type, $grid_hres,
+    $file_desc, $file_name
+);
+$command = implode(' ', array_map('escapeshellarg', $arguments));
+$output = array();
+$exit_status = 1;
+try {
+    exec($command . ' 2>&1', $output, $exit_status);
+} catch (Throwable $error) {
+    error_log('Ancillary upload process could not be started: ' . $error->getMessage());
+    upload_response(500, 'Unable to start the upload processor. Please contact the server administrator.');
+}
+if ($exit_status !== 0) {
+    upload_response(500, 'Upload processing failed. Please contact the server administrator before retrying.', implode("\n", $output));
+}
+upload_response(200, 'Upload processing completed for ' . $file_name . '. MD5 checksum: ' . $md5_value, implode("\n", $output));
