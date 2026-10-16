@@ -14,7 +14,7 @@ define('PROJECT_PATH', realpath(__DIR__ . '/../../..') . '/');   // i.e. /storag
 define('CPDN_LOCAL',   __DIR__ );
 define('BOINC_INC',    PROJECT_PATH . 'html/inc/');
 define('LOCAL_INC',    __DIR__ . '/include/');
-define('PROJECT_INC',  PROJECT_PATH . 'html/project');
+define('PROJECT_INC',  PROJECT_PATH . 'html/project/');
 
 // =========================================================================
 // 2. CLIENT-SIDE PATHS (HTML) - *MUST* always start with "/" to target the domain root
