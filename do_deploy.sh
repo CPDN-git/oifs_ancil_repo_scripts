@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 #
-# Deploy ancillary repository webpages to user space (html/user/cpdn).
+# Deploy ancillary repository webpages to user space (html/user/project).
 #
 
 set -e
 
-DEPLOYDIR="/storage/www/cpdnboinc/html/user/cpdn"
+DEPLOYDIR="/storage/www/cpdnboinc/html/user/project"
 PROJECTDIR="/storage/www/cpdnboinc/html/project"
 REPODIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 

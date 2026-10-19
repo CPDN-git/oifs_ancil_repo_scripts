@@ -9,4 +9,4 @@ the upload handler also uses `$python_env` and `$oifs_path` for its backend.
 The configuration file is managed on the server and is not deployed by this repo.
 
 Deployment routes any repository-owned `.inc` files to `html/project`;
-PHP pages remain in `html/user/cpdn`. Site configuration is managed on the server.
+PHP pages remain in `html/user/project`. Site configuration is managed on the server.

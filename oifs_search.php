@@ -21,7 +21,7 @@ if (!isset($project_path) || !is_string($project_path) || $project_path === '') 
 // 1. SERVER-SIDE PATHS (PHP) - Always use explicit absolute paths
 // =========================================================================
 define('PROJECT_PATH', rtrim($project_path, '/') . '/');
-define('CPDN_LOCAL',   PROJECT_PATH . 'html/user/cpdn');
+define('CPDN_LOCAL',   PROJECT_PATH . 'html/user/project');
 define('BOINC_INC',    PROJECT_PATH . 'html/inc/');
 define('PROJECT_INC', rtrim($project_path, '/') . '/html/project/');
 
@@ -88,7 +88,7 @@ class Auto_Table extends HTML_table {
             foreach (array_slice($row, 0, -1) as $index => $cell) {
                 $content = htmlspecialchars((string)$cell, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
                 if ($index === 0) {
-                    $details_url = 'https://main.cpdn.org/cpdn/oifs_ancil_details.php?file_name='
+                    $details_url = 'https://main.cpdn.org/project/oifs_ancil_details.php?file_name='
                         . rawurlencode((string)$cell);
                     $content = '<a href="'
                         . htmlspecialchars($details_url, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')
@@ -122,7 +122,7 @@ echo '<div style="clear: both;"></div>';
 echo '</div>';
 echo '<hr><h1>OpenIFS file search</h1><br>';
 ?>
-<form action="/cpdn/oifs_search.php" method="post">
+<form action="/project/oifs_search.php" method="post">
     <table width="100%" border="0" style="border:none;">
         <tr class="nohover">
             <td><label>File Name:<br></label><input type="text" name="by_name" /></td>

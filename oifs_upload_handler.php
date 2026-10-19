@@ -23,7 +23,7 @@ if (!isset($project_path) || !is_string($project_path) || $project_path === '') 
 // 1. SERVER-SIDE PATHS (PHP) - Always use explicit absolute paths
 // =========================================================================
 define('PROJECT_PATH', rtrim($project_path, '/') . '/');
-define('CPDN_LOCAL',   PROJECT_PATH . 'html/user/cpdn');
+define('CPDN_LOCAL',   PROJECT_PATH . 'html/user/project');
 define('BOINC_INC',    PROJECT_PATH . 'html/inc/');
 define('PROJECT_INC',  PROJECT_PATH . 'html/project/');
 
@@ -48,7 +48,7 @@ require_once(PROJECT_INC . 'oifs_uploaders.inc');
 // BOINC's default login redirect drops the directory from the return URL.
 $user = get_logged_in_user(false);
 if (!$user) {
-    header('Location: /login_form.php?next_url=' . rawurlencode('cpdn/oifs_upload_form.php'));
+    header('Location: /login_form.php?next_url=' . rawurlencode('project/oifs_upload_form.php'));
     exit;
 }
 if (!isset($allowed_uploaders) || !is_array($allowed_uploaders)) {
@@ -89,7 +89,7 @@ EOH;
     if ($output !== '') {
         echo '<pre>' . $output_html . '</pre>';
     }
-    echo '<p><a href="/cpdn/oifs_upload_form.php">Return to the upload form</a></p>';
+    echo '<p><a href="/project/oifs_upload_form.php">Return to the upload form</a></p>';
     echo '</body></html>';
     exit;
 }

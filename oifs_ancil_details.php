@@ -21,7 +21,7 @@ if (!isset($project_path) || !is_string($project_path) || $project_path === '') 
 // 1. SERVER-SIDE PATHS (PHP) - Always use explicit absolute paths
 // =========================================================================
 define('PROJECT_PATH', rtrim($project_path, '/') . '/');
-define('CPDN_LOCAL',   PROJECT_PATH . 'html/user/cpdn');
+define('CPDN_LOCAL',   PROJECT_PATH . 'html/user/project');
 define('BOINC_INC',    PROJECT_PATH . 'html/inc/');
 define('PROJECT_INC', rtrim($project_path, '/') . '/html/project/');
 

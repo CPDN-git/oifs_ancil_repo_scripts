@@ -23,7 +23,7 @@ if (!isset($project_path) || !is_string($project_path) || $project_path === '') 
 // 1. SERVER-SIDE PATHS (PHP) - Always use explicit absolute paths
 // =========================================================================
 define('PROJECT_PATH', rtrim($project_path, '/') . '/');
-define('CPDN_LOCAL',   PROJECT_PATH . 'html/user/cpdn');
+define('CPDN_LOCAL',   PROJECT_PATH . 'html/user/project');
 define('BOINC_INC',    PROJECT_PATH . 'html/inc/');
 define('PROJECT_INC',  PROJECT_PATH . 'html/project/');
 
@@ -48,7 +48,7 @@ require_once(PROJECT_INC . 'oifs_uploaders.inc');
 // BOINC's default login redirect drops the directory from the return URL.
 $user = get_logged_in_user(false);
 if (!$user) {
-    header('Location: /login_form.php?next_url=' . rawurlencode('cpdn/oifs_upload_form.php'));
+    header('Location: /login_form.php?next_url=' . rawurlencode('project/oifs_upload_form.php'));
     exit;
 }
 if (!isset($allowed_uploaders) || !is_array($allowed_uploaders)) {
@@ -160,7 +160,7 @@ echo '<p>' . htmlspecialchars((string)$user->name, ENT_QUOTES | ENT_SUBSTITUTE, 
     . ' is logged in</p>';
     ?>
     <p>Enter the following information to upload your experiment file. Upload one archive or namelist per submission.</p>
-    <form id="upload_form" name="upload_form" action="/cpdn/oifs_upload_handler.php" method="post" enctype="multipart/form-data">
+    <form id="upload_form" name="upload_form" action="/project/oifs_upload_handler.php" method="post" enctype="multipart/form-data">
     Created by: <input type="text" name="created_by" required>
     Model version: <select id="model_version" name="model_version" class="dropdown" onchange="condDisp(this.form.elements['ancil_type'].value, this.value);">
         <option value="0">Select</option>
