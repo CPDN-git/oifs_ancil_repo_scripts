@@ -25,7 +25,6 @@ if (!isset($project_path) || !is_string($project_path) || $project_path === '') 
 define('PROJECT_PATH', rtrim($project_path, '/') . '/');
 define('CPDN_LOCAL',   PROJECT_PATH . 'html/user/cpdn');
 define('BOINC_INC',    PROJECT_PATH . 'html/inc/');
-define('LOCAL_INC',    CPDN_LOCAL . '/include/');
 define('PROJECT_INC',  PROJECT_PATH . 'html/project/');
 
 // =========================================================================

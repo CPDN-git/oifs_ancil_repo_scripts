@@ -23,7 +23,6 @@ if (!isset($project_path) || !is_string($project_path) || $project_path === '') 
 define('PROJECT_PATH', rtrim($project_path, '/') . '/');
 define('CPDN_LOCAL',   PROJECT_PATH . 'html/user/cpdn');
 define('BOINC_INC',    PROJECT_PATH . 'html/inc/');
-define('LOCAL_INC',    CPDN_LOCAL . '/include/');
 define('PROJECT_INC', rtrim($project_path, '/') . '/html/project/');
 
 // =========================================================================
@@ -43,7 +42,7 @@ set_include_path(
 require_once(BOINC_INC . 'util.inc');
 
 // Load custom local classes explicitly
-require_once(LOCAL_INC . 'html_table.class.php');
+require_once(PROJECT_INC . 'html_table.class.php');
 
 // Load cpdn custom config XML
 $xml = simplexml_load_file(PROJECT_PATH . "ancil_batch_user_config.xml")
