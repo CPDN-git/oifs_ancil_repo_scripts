@@ -1,12 +1,12 @@
 <?php
 
-// Load host configuration from the CPDN include directory before defining paths.
+// Load host configuration from html/project before defining paths.
 // BOINC and the legacy site detection expect html/user as the working directory.
 if (!chdir(__DIR__ . '/..')) {
     http_response_code(500);
     exit('Unable to select the BOINC web directory.');
 }
-$config_file = __DIR__ . '/include/batch_site_config.inc';
+$config_file = __DIR__ . '/../../project/batch_site_config.inc';
 if (!is_readable($config_file)) {
     http_response_code(500);
     exit('Batch site configuration is unavailable.');
@@ -24,6 +24,7 @@ define('PROJECT_PATH', rtrim($project_path, '/') . '/');
 define('CPDN_LOCAL',   PROJECT_PATH . 'html/user/cpdn');
 define('BOINC_INC',    PROJECT_PATH . 'html/inc/');
 define('LOCAL_INC',    CPDN_LOCAL . '/include/');
+define('PROJECT_INC', rtrim($project_path, '/') . '/html/project/');
 
 // =========================================================================
 // 2. CLIENT-SIDE PATHS (HTML) - *MUST* always start with "/" to target the domain root
@@ -35,7 +36,8 @@ define('LOCAL_INC',    CPDN_LOCAL . '/include/');
 set_include_path(
     get_include_path() .
     PATH_SEPARATOR . BOINC_INC .
-    PATH_SEPARATOR . CPDN_LOCAL
+    PATH_SEPARATOR . CPDN_LOCAL .
+    PATH_SEPARATOR . PROJECT_INC
 );
 
 require_once(BOINC_INC . 'util.inc');
