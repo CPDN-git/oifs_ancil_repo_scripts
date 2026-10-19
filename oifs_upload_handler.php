@@ -148,11 +148,11 @@ if ($file_name === '' || $file_name === '.' || $file_name === '..' ||
 }
 
 // Use the host configuration for the Python environment and backend location.
-if (!isset($python_env, $oifs_path) || !is_string($python_env) || $python_env === '' ||
-    !is_string($oifs_path) || $oifs_path === '') {
+if (!isset($python_env, $oifs_repo_root) || !is_string($python_env) || $python_env === '' ||
+    !is_string($oifs_repo_root) || $oifs_repo_root === '') {
     upload_response(500, 'The upload processor configuration is incomplete.');
 }
-$script_file = rtrim($oifs_path, '/') . '/oifs_ancil_repo_scripts/oifs_file_upload_handler.py';
+$script_file = rtrim($oifs_repo_root, '/') . '/oifs_ancil_repo_scripts/oifs_file_upload_handler.py';
 $tmp_dir = realpath(PROJECT_PATH . 'tmp_ancil_upload');
 if ($tmp_dir === false || !is_dir($tmp_dir) || !is_readable($tmp_dir)) {
     upload_response(500, 'The upload staging directory is unavailable.');
