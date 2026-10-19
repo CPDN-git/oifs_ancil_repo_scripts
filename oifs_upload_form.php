@@ -2,13 +2,30 @@
 
 //  OpenIFS ancil file upload form
 
+// Load host configuration from the CPDN include directory before defining paths.
+// BOINC and the legacy site detection expect html/user as the working directory.
+if (!chdir(__DIR__ . '/..')) {
+    http_response_code(500);
+    exit('Unable to select the BOINC web directory.');
+}
+$config_file = __DIR__ . '/include/batch_site_config.inc';
+if (!is_readable($config_file)) {
+    http_response_code(500);
+    exit('Batch site configuration is unavailable.');
+}
+require_once($config_file);
+if (!isset($project_path) || !is_string($project_path) || $project_path === '') {
+    http_response_code(500);
+    exit('Batch site configuration is incomplete for this host.');
+}
+
 // =========================================================================
 // 1. SERVER-SIDE PATHS (PHP) - Always use explicit absolute paths
 // =========================================================================
-define('PROJECT_PATH', realpath(__DIR__ . '/../../..') . '/');   // i.e. /storage/www/cpdnboinc
-define('CPDN_LOCAL',   __DIR__ );
+define('PROJECT_PATH', rtrim($project_path, '/') . '/');
+define('CPDN_LOCAL',   PROJECT_PATH . 'html/user/cpdn');
 define('BOINC_INC',    PROJECT_PATH . 'html/inc/');
-define('LOCAL_INC',    __DIR__ . '/include/');
+define('LOCAL_INC',    CPDN_LOCAL . '/include/');
 define('PROJECT_INC',  PROJECT_PATH . 'html/project/');
 
 // =========================================================================
@@ -17,16 +34,11 @@ define('PROJECT_INC',  PROJECT_PATH . 'html/project/');
 //    Where "/img/mylogo.png"   means  main.cpdn.org/img/mylogo.png
 // =========================================================================
 
-
-//  Now switch to boinc's html root so all the includes load correctly
-chdir(CPDN_LOCAL . '/..');
-
 set_include_path(
     get_include_path() .
     PATH_SEPARATOR . BOINC_INC .
     PATH_SEPARATOR . CPDN_LOCAL
 );
-
 
 require_once(BOINC_INC . 'util.inc');
 require_once(BOINC_INC . 'user.inc');

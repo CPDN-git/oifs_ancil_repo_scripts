@@ -2,13 +2,30 @@
 
 //  OpenIFS ancillary file upload handler
 
+// Load host configuration from the CPDN include directory before defining paths.
+// BOINC and the legacy site detection expect html/user as the working directory.
+if (!chdir(__DIR__ . '/..')) {
+    http_response_code(500);
+    exit('Unable to select the BOINC web directory.');
+}
+$config_file = __DIR__ . '/include/batch_site_config.inc';
+if (!is_readable($config_file)) {
+    http_response_code(500);
+    exit('Batch site configuration is unavailable.');
+}
+require_once($config_file);
+if (!isset($project_path) || !is_string($project_path) || $project_path === '') {
+    http_response_code(500);
+    exit('Batch site configuration is incomplete for this host.');
+}
+
 // =========================================================================
 // 1. SERVER-SIDE PATHS (PHP) - Always use explicit absolute paths
 // =========================================================================
-define('PROJECT_PATH', realpath(__DIR__ . '/../../..') . '/');   // i.e. /storage/www/cpdnboinc
-define('CPDN_LOCAL',   __DIR__ );
+define('PROJECT_PATH', rtrim($project_path, '/') . '/');
+define('CPDN_LOCAL',   PROJECT_PATH . 'html/user/cpdn');
 define('BOINC_INC',    PROJECT_PATH . 'html/inc/');
-define('LOCAL_INC',    __DIR__ . '/include/');
+define('LOCAL_INC',    CPDN_LOCAL . '/include/');
 define('PROJECT_INC',  PROJECT_PATH . 'html/project/');
 
 // =========================================================================
@@ -17,16 +34,11 @@ define('PROJECT_INC',  PROJECT_PATH . 'html/project/');
 //    Where "/img/mylogo.png"   means  main.cpdn.org/img/mylogo.png
 // =========================================================================
 
-
-//  Now switch to boinc's html root so all the includes load correctly
-chdir(CPDN_LOCAL . '/..');
-
 set_include_path(
     get_include_path() .
     PATH_SEPARATOR . BOINC_INC .
     PATH_SEPARATOR . CPDN_LOCAL
 );
-
 
 require_once(BOINC_INC . 'util.inc');
 require_once(BOINC_INC . 'user.inc');
@@ -135,9 +147,12 @@ if ($file_name === '' || $file_name === '.' || $file_name === '..' ||
     upload_response(400, 'Invalid uploaded filename.');
 }
 
-// Retain the configured server Python environment and backend location.
-$python_env = '/home/boinc/miniconda3/envs/py3new/bin/python';
-$script_file = '/home/boinc/cpdnboinc/oifs_ancil_repo_scripts/oifs_file_upload_handler.py';
+// Use the host configuration for the Python environment and backend location.
+if (!isset($python_env, $oifs_path) || !is_string($python_env) || $python_env === '' ||
+    !is_string($oifs_path) || $oifs_path === '') {
+    upload_response(500, 'The upload processor configuration is incomplete.');
+}
+$script_file = rtrim($oifs_path, '/') . '/oifs_ancil_repo_scripts/oifs_file_upload_handler.py';
 $tmp_dir = realpath(PROJECT_PATH . 'tmp_ancil_upload');
 if ($tmp_dir === false || !is_dir($tmp_dir) || !is_readable($tmp_dir)) {
     upload_response(500, 'The upload staging directory is unavailable.');
