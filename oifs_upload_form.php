@@ -43,7 +43,7 @@ set_include_path(
 require_once(BOINC_INC . 'util.inc');
 require_once(BOINC_INC . 'user.inc');
 require_once(BOINC_INC . 'boinc_db.inc');
-require_once(PROJECT_INC . 'oifs_uploaders.inc');
+require_once(PROJECT_INC . 'allowed_uploaders.inc');
 
 // BOINC's default login redirect drops the directory from the return URL.
 $user = get_logged_in_user(false);
