@@ -242,7 +242,7 @@ $upload_token = hash_hmac('sha256', $user->id . ':' . $upload_id . ':' . $upload
                     if (failed || !received || up.files.length !== 1
                         || up.files[0].status !== plupload.DONE) return;
                     completed = true;
-                    status.textContent = 'Upload complete. Processing the ancillary file…';
+                    status.textContent = 'Upload complete. Processing the ancillary file. Please wait...';
                     form.querySelectorAll('[data-upload-enabled]').forEach(function (field) {
                         field.disabled = false;
                     });
