@@ -202,8 +202,7 @@ def unpack_upload_file(Args):
         tar.extractall(path=tmp_dir)
     rootDir = tmp_dir + Args.exptid
 
-    # Walk the untarred file and create zips. Preserve explicit analysis directories
-    # and the implicit single-analysis value 00 used by the original implementation.
+    # Read the original analysis directories; publish analysis numbers as three digits.
     with staged_outputs() as directories:
         plans = []
         for dirName, subdirList, fileList in os.walk(rootDir, topdown=True):
@@ -217,8 +216,9 @@ def unpack_upload_file(Args):
                     shutil.rmtree(dirName + '/ecmwf')
                 analyses = [(number, dirName + '/' + number) for number in analysis_nos]
                 if not analyses:
-                    analyses = [('00', dirName)]
+                    analyses = [('000', dirName)]
                 for analysis_no, analysis_dir in analyses:
+                    analysis_no = analysis_no.zfill(3)
                     zipname = 'ic_' + Args.exptid + '_' + date + '_' + analysis_no
                     adir = ancil_dir + '/' + Args.exptid + '/' + date + '/' + analysis_no + '/'
                     destination = adir + zipname + '.zip'
