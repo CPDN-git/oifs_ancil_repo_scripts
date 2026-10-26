@@ -48,6 +48,26 @@ served as /js/plupload.full.min.js. The old plupload_handler.php remains deleted
 it is not an external dependency and must not be redeployed from a snapshot.
 No live deployment or scheduler update is performed by source edits.
 
+### PHP upload sizes
+
+The PHP form uploads 100MiB chunks. Each request is 104,858,924 bytes, including multipart overhead.
+This can exceed the default sizes for the PHP Apache2 module.
+
+Locate the php.ini file, typically in /etc/php/<version>/apache2/php.ini.
+
+Find and change these options to these values:
+
+```
+upload_max_filesize = 100M
+post_max_size = 128M
+```
+
+Then restart Apache:
+
+```
+sudo systemctl restart apache2
+```
+
 ## Form and query safeguards
 
 All ancillary pages require login plus uploader authorization and return no-store
