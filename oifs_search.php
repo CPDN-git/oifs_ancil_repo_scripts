@@ -1,63 +1,38 @@
 <?php
-
-// Load host configuration from html/project before defining paths.
-// BOINC and the legacy site detection expect html/user as the working directory.
-if (!chdir(__DIR__ . '/..')) {
-    http_response_code(500);
-    exit('Unable to select the BOINC web directory.');
-}
-$config_file = __DIR__ . '/../../project/batch_site_config.inc';
-if (!is_readable($config_file)) {
-    http_response_code(500);
-    exit('Batch site configuration is unavailable.');
-}
-require_once($config_file);
-if (!isset($project_path) || !is_string($project_path) || $project_path === '') {
-    http_response_code(500);
-    exit('Batch site configuration is incomplete for this host.');
-}
-
-// =========================================================================
-// 1. SERVER-SIDE PATHS (PHP) - Always use explicit absolute paths
-// =========================================================================
-define('PROJECT_PATH', rtrim($project_path, '/') . '/');
-define('CPDN_LOCAL',   PROJECT_PATH . 'html/user/project');
-define('BOINC_INC',    PROJECT_PATH . 'html/inc/');
-define('PROJECT_INC', rtrim($project_path, '/') . '/html/project/');
-
-// =========================================================================
-// 2. CLIENT-SIDE PATHS (HTML) - *MUST* always start with "/" to target the domain root
-//    e.g. src="/img/mylogo.png"  and not  src="../img/mylogo.png"
-//    Where "/img/mylogo.png"   means  main.cpdn.org/img/mylogo.png
-// =========================================================================
-
-// Load BOINC using its absolute server location
-set_include_path(
-    get_include_path() .
-    PATH_SEPARATOR . BOINC_INC .
-    PATH_SEPARATOR . CPDN_LOCAL .
-    PATH_SEPARATOR . PROJECT_INC
-);
-
+// Set the BOINC working directory, load site configuration, and define include paths.
+require_once __DIR__ . '/../../project/cpdn_web_bootstrap.inc';
+require_once(PROJECT_INC . 'oifs_ancil_web_common.inc');
 require_once(BOINC_INC . 'util.inc');
+require_once(BOINC_INC . 'user.inc');
+header('Cache-Control: no-store');
+header('X-Content-Type-Options: nosniff');
+$user = get_logged_in_user(false);
+if (!$user) {
+    $return_url = 'project/oifs_search.php';
+    if (!empty($_SERVER['QUERY_STRING'])) {
+        $return_url .= '?' . $_SERVER['QUERY_STRING'];
+    }
+    header('Location: /login_form.php?next_url=' . rawurlencode($return_url));
+    exit;
+}
+require_once(PROJECT_INC . 'allowed_uploaders.inc');
+if (!isset($allowed_uploaders) || !is_array($allowed_uploaders)) {
+    error_log('Ancillary authorization configuration is unavailable.');
+    oifs_ancil_error(500, 'Uploader authorization configuration is unavailable.');
+}
+if (!in_array($user->email_addr, $allowed_uploaders, true)) {
+    oifs_ancil_error(403, 'This page has restricted access.');
+}
+header('Content-Type: text/html; charset=UTF-8');
 
-// Load custom local classes explicitly
 require_once(PROJECT_INC . 'html_table.class.php');
-
-// Load cpdn custom config XML
-$xml = simplexml_load_file(PROJECT_PATH . "ancil_batch_user_config.xml")
-    or die("Error: Configuration file missing.");
-
-$host= $xml->ancil_db_host;
-$dbname=$xml->ancil_db_name;
-$boinc_dbname=$xml->ancil_boinc_db_name;
-$user= $xml->ancil_user;
-$pass= $xml->ancil_passwd;
 
 class Auto_Table extends HTML_table {
     public function make_table($statement) {
-        $metadata = $statement->result_metadata()
-            or die('Error reading search columns: ' . $statement->error);
+        $metadata = $statement->result_metadata();
+        if ($metadata === false) {
+            throw new RuntimeException('Search result metadata is unavailable.');
+        }
         $fields = $metadata->fetch_fields();
 
         $this->addTSection('thead');
@@ -73,8 +48,7 @@ class Auto_Table extends HTML_table {
 
         // Bind result columns directly, without requiring mysqli get_result().
         $row = array_fill(0, count($fields), null);
-        $statement->bind_result(...$row)
-            or die('Error binding search results: ' . $statement->error);
+        $statement->bind_result(...$row);
 
         $this->addTSection('tbody');
         while ($statement->fetch()) {
@@ -101,7 +75,12 @@ class Auto_Table extends HTML_table {
     }
 }
 
-echo <<<EOH
+ob_start();
+$ancil_buffer_level = ob_get_level();
+$link = null;
+try {
+
+    echo <<<EOH
 <!DOCTYPE html>
 <html>
 <head>
@@ -113,20 +92,20 @@ echo <<<EOH
 <body>
 EOH;
 
-echo '<div class="wrap" style="width:100%">';
-echo '<div style="width:100%">';
-echo '<img src="/img/OIFS_Home_logo.png" alt="OpenIFS@home" style="width:200px">';
-echo '<img src="/img/CPDN_abbrv_logo.png" alt="CPDN" style="width:250px; float:right;">';
-echo '</div>';
-echo '<div style="clear: both;"></div>';
-echo '</div>';
-echo '<hr><h1>OpenIFS file search</h1><br>';
+    echo '<div class="wrap" style="width:100%">';
+    echo '<div style="width:100%">';
+    echo '<img src="/img/OIFS_Home_logo.png" alt="OpenIFS@home" style="width:200px">';
+    echo '<img src="/img/CPDN_abbrv_logo.png" alt="CPDN" style="width:250px; float:right;">';
+    echo '</div>';
+    echo '<div style="clear: both;"></div>';
+    echo '</div>';
+    echo '<hr><h1>OpenIFS file search</h1><br>';
 ?>
 <form action="/project/oifs_search.php" method="post">
     <table width="100%" border="0" style="border:none;">
         <tr class="nohover">
-            <td><label>File Name:<br></label><input type="text" name="by_name" /></td>
-            <td><label>Case Study/Description:<br></label><input type="text" name="by_desc" /></td>
+            <td><label>File Name:<br></label><input type="text" name="by_name" maxlength="100" /></td>
+            <td><label>Case Study/Description:<br></label><input type="text" name="by_desc" maxlength="1024" /></td>
             <td><label>Type:<br></label><select name="by_type">
                 <option value="">Select...</option>
                 <option value="ic_ancil">initial files</option>
@@ -140,69 +119,75 @@ echo '<hr><h1>OpenIFS file search</h1><br>';
                 <option value="other_radiation_files">Other radiation files</option>
                 <option value="SO4_files">SO4 files</option>
             </select></td>
-            <td><label>Start Date:<br></label><input type="text" name="by_start" /></td>
-            <td><label>ECMWF exptid:<br></label><input type="text" name="by_exptid" /></td>
+            <td><label>Start Date:<br></label><input type="text" name="by_start" maxlength="10" /></td>
+            <td><label>ECMWF exptid:<br></label><input type="text" name="by_exptid" maxlength="4" /></td>
             <td><input class="button" type="submit" name="submit" value="Search" /></td>
         </tr>
     </table>
 </form>
 <?php
-if (isset($_POST['submit'])) {
-    $query = "SELECT file_name as 'File name', date(create_time) as 'Creation date', created_by as 'Created by', description as 'Description', ancil_type as 'Type', IF(STRCMP(ancil_sub_type,'0') = 0,'',ancil_sub_type) as 'Sub type', model_version_number as 'Model version', exptid as 'Exptid', starting_analysis as 'Starting analysis', analysis_perturbation_number as 'Analysis number', start_date as 'Start date', end_date as 'End date', CONCAT(COALESCE(grid_type,''),COALESCE(spectral_horizontal_resolution,''),COALESCE(gridpoint_horizontal_resolution,'')) as 'Horizontal resolution', vertical_resolution as 'Vertical resolution', batches_used as 'Batches used' FROM " . $dbname . '.oifs_ancil_files';
-    $conditions = array();
-    $parameters = array();
-    // SQL column names and operators come only from this fixed mapping.
-    $filters = array(
-        'by_name' => array('file_name', 'LIKE'),
-        'by_desc' => array('description', 'LIKE'),
-        'by_type' => array('ancil_type', '='),
-        'by_subtype' => array('ancil_sub_type', '='),
-        'by_start' => array('start_date', '='),
-        'by_exptid' => array('exptid', '=')
-    );
-    foreach ($filters as $input => $filter) {
-        $value = $_POST[$input] ?? '';
-        if (!is_string($value)) {
-            die('Invalid search value.');
+    if (isset($_POST['submit'])) {
+        list($link, $dbname) = oifs_ancil_database();
+        $query = "SELECT file_name as 'File name', date(create_time) as 'Creation date', created_by as 'Created by', description as 'Description', ancil_type as 'Type', IF(STRCMP(ancil_sub_type,'0') = 0,'',ancil_sub_type) as 'Sub type', model_version_number as 'Model version', exptid as 'Exptid', starting_analysis as 'Starting analysis', analysis_perturbation_number as 'Analysis number', start_date as 'Start date', end_date as 'End date', CONCAT(COALESCE(grid_type,''),COALESCE(spectral_horizontal_resolution,''),COALESCE(gridpoint_horizontal_resolution,'')) as 'Horizontal resolution', vertical_resolution as 'Vertical resolution', batches_used as 'Batches used' FROM " . $dbname . '.oifs_ancil_files';
+        $conditions = array();
+        $parameters = array();
+        // SQL column names and operators come only from this fixed mapping.
+        $filters = array(
+            'by_name' => array('file_name', 'LIKE'),
+            'by_desc' => array('description', 'LIKE'),
+            'by_type' => array('ancil_type', '='),
+            'by_subtype' => array('ancil_sub_type', '='),
+            'by_start' => array('start_date', '='),
+            'by_exptid' => array('exptid', '=')
+        );
+        $limits = array('by_name' => 100, 'by_desc' => 1024, 'by_type' => 25,
+            'by_subtype' => 21, 'by_start' => 10, 'by_exptid' => 4);
+        foreach ($filters as $input => $filter) {
+            $value = $_POST[$input] ?? '';
+            if (!oifs_ancil_valid_text($value, $limits[$input], true)) {
+                oifs_ancil_error(400, 'A search value is invalid or too long.');
+            }
+            if ($value !== '') {
+                $conditions[] = $filter[0] . ' ' . $filter[1] . ' ?';
+                $parameters[] = $filter[1] === 'LIKE' ? '%' . $value . '%' : $value;
+            }
         }
-        if ($value !== '') {
-            $conditions[] = $filter[0] . ' ' . $filter[1] . ' ?';
-            $parameters[] = $filter[1] === 'LIKE' ? '%' . $value . '%' : $value;
+        $sql = $query;
+        if (count($conditions) > 0) {
+            $sql .= ' WHERE ' . implode(' AND ', $conditions);
         }
-    }
-    $sql = $query;
-    if (count($conditions) > 0) {
-        $sql .= ' WHERE ' . implode(' AND ', $conditions);
-    }
-    $table_class = 'cpdnTable';
+        $table_class = 'cpdnTable';
 
-    $link = mysqli_connect($host, $user, $pass, $dbname)
-        or die('Error ' . mysqli_connect_error());
-    $link->set_charset('utf8mb4')
-        or die('Error setting search encoding: ' . mysqli_error($link));
-    $statement = $link->prepare($sql)
-        or die('Error preparing search: ' . mysqli_error($link));
-    if (count($parameters) > 0) {
-        $types = str_repeat('s', count($parameters));
-        $statement->bind_param($types, ...$parameters)
-            or die('Error binding search: ' . $statement->error);
-    }
-    $statement->execute()
-        or die('Error executing search: ' . $statement->error);
-    $statement->store_result()
-        or die('Error storing search results: ' . $statement->error);
+        $statement = $link->prepare($sql);
+        if (count($parameters) > 0) {
+            $types = str_repeat('s', count($parameters));
+            $statement->bind_param($types, ...$parameters);
+        }
+        $statement->execute();
+        $statement->store_result();
 
-    if ($statement->num_rows > 0) {
-        $tbl = new Auto_Table('SearchResultsTable', $table_class);
-        $tbl->make_table($statement);
-        echo $tbl->display();
-    } else {
-        echo '<p>No matching files found.</p>';
+        if ($statement->num_rows > 0) {
+            $tbl = new Auto_Table('SearchResultsTable', $table_class);
+            $tbl->make_table($statement);
+            echo $tbl->display();
+        } else {
+            echo '<p>No matching files found.</p>';
+        }
+        $statement->free_result();
+        $statement->close();
+
     }
-    $statement->free_result();
-    $statement->close();
-    mysqli_close($link);
-}
 ?>
 </body>
 </html>
+
+<?php
+    ob_end_flush();
+} catch (Throwable $error) {
+    error_log('Ancillary search failed: ' . $error->getMessage());
+    oifs_ancil_error(500, 'Unable to search ancillary files. Please contact the server administrator.');
+} finally {
+    if ($link instanceof mysqli) {
+        $link->close();
+    }
+}

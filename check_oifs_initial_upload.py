@@ -15,7 +15,9 @@ Copy the preflight script to /tmp/ on the server, then run it as the actual PHP 
   --archive /path/to/trial-files.tgz \
   --exptid AB12
 
-Replace the account, archive path and experiment ID. 
+Replace the account, archive path and experiment ID. The default --scripts root
+is /home/boinc/cpdnboinc and selects its oifs_ancil_repo_scripts checkout; pass an
+explicit --scripts path for another installation.
 The script checks dependencies, archive layout, database schema/grants, 
 destination collisions and the backend’s actual GRIB metadata parsing. 
 It performs no database writes or repository changes; temporary GRIB copies 
@@ -155,7 +157,8 @@ def check_database(backend, groups, experiment, repository):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--scripts', type=Path, default=Path('/storage/www/cpdnboinc/oifs_ancil_repo_scripts'))
+    parser.add_argument('--scripts', type=Path, default=Path('/home/boinc/cpdnboinc'),
+                        help='Parent of the oifs_ancil_repo_scripts checkout (or the checkout itself).')
     parser.add_argument('--incoming', type=Path, default=Path('/storage/www/cpdnboinc/tmp_ancil_upload'))
     parser.add_argument('--repository', type=Path, default=Path('/storage/cpdn_ancil_files/oifs_ancil_files'))
     parser.add_argument('--archive', type=Path, required=True)
@@ -165,6 +168,10 @@ def main():
     args = parser.parse_args()
     if not re.fullmatch(r'[A-Za-z0-9]{4}', args.exptid) or args.max_unpacked_gib < 1:
         parser.error('Use a four-character experiment ID and a positive size limit.')
+    # Keep --scripts compatible with an explicit backend checkout while defaulting
+    # to the authoritative parent of the CPDN repositories.
+    if not (args.scripts/'oifs_file_upload_handler.py').is_file():
+        args.scripts = args.scripts/'oifs_ancil_repo_scripts'
     sys.dont_write_bytecode = True
     for path in (args.scripts/'oifs_file_upload_handler.py', args.scripts/'eccodes_config.py', args.archive):
         require_access(path, os.R_OK)

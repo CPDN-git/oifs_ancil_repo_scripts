@@ -18,9 +18,25 @@ deploy_file() {
     fi
     local deployed_file="$target_dir/$(basename -- "$repo_file")"
     local compare_status
+    local link_target
 
     if [[ ! -f "$repo_file" ]]; then
         printf 'Cannot deploy: repo file is missing or not a regular file: %s\n' "$repo_file" >&2
+        return 1
+    fi
+
+    # Never copy through, replace or change permissions on a destination symlink.
+    if [[ -L "$deployed_file" ]]; then
+        printf 'Deployment stopped: destination is a symbolic link: %s\n' "$deployed_file" >&2
+        if link_target=$(readlink -- "$deployed_file"); then
+            printf 'Link target: %s\n' "$link_target" >&2
+        else
+            printf 'Unable to read the link target; check permissions.\n' >&2
+        fi
+        if [[ ! -e "$deployed_file" ]]; then
+            printf 'The link target is missing or inaccessible.\n' >&2
+        fi
+        printf 'Link and target left untouched. Resolve the link manually, then rerun deployment.\n' >&2
         return 1
     fi
 
@@ -35,13 +51,14 @@ deploy_file() {
         return 0
     fi
 
-    if cmp -s -- "$repo_file" "$deployed_file"; then
+    # Suppress normal difference output, but retain stderr explaining read errors.
+    if cmp -- "$repo_file" "$deployed_file" >/dev/null; then
         printf 'Identical; no copy: %s\n' "$deployed_file"
         return 0
     else
         compare_status=$?
         if (( compare_status > 1 )); then
-            printf 'Cannot compare files; no copy: %s and %s\n' "$repo_file" "$deployed_file" >&2
+            printf 'Deployment stopped: cannot compare files; no copy: %s and %s\n' "$repo_file" "$deployed_file" >&2
             return "$compare_status"
         fi
     fi
@@ -58,12 +75,21 @@ deploy_file() {
 
 echo "Deploying OIFS ancillary repository webpages into position on live server.."
 
+project_includes=(
+    oifs_ancil_web_common.inc
+)
+
 deploy_files=(
     oifs_upload_form.php
     oifs_upload_handler.php
     oifs_search.php
     oifs_ancil_details.php
 )
+
+for include_file in "${project_includes[@]}"
+do
+    deploy_file "$PROJECTDIR" "$REPODIR/$include_file"
+done
 
 for file in "${deploy_files[@]}"
 do
