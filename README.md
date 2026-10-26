@@ -99,7 +99,7 @@ the full multi-gigabyte file is not loaded into PHP memory. A shared processing
 lock serializes backend calls, and a pre-existing incoming filename is not replaced.
 The assembled file is placed at `PROJECT_PATH/tmp_ancil_upload/<original filename>`.
 The final positional argument to Python is that basename, not the private chunk
-path or an HTTP temporary filename. Python retains its existing move/delete lifecycle.
+path or an HTTP temporary filename. Python removes the incoming original only after publication is committed.
 Checksums displayed on success describe the original uploaded file.
 
 The configured python_env runs
@@ -123,7 +123,7 @@ proc_open receives an argument array, without shell interpolation. A -- separato
 prevents metadata beginning with a dash from being parsed as options. Disabled
 irrelevant controls are intentionally absent from POST; validated_metadata() supplies
 the defaults above rather than requiring missing fields. This preserves the Python
-interface without modifying the locked backend.
+interface after the backend publication/recovery changes.
 
 The current Python backend hard-codes the production incoming directory and XML
 configuration. PHP therefore compares the configured canonical staging/config paths
@@ -180,19 +180,59 @@ backend checkout itself. Pass --incoming/--repository for non-default storage an
 use the configured Python environment and actual PHP worker account. These flags
 affect preflight checks only: they do not reconfigure the production upload backend.
 
-## Deferred backend review
+## Backend publication and recovery
 
-Edits to oifs_file_upload_handler.py remain locked pending detailed review. PHP
-now enforces chunk ownership itself; there is no outstanding external chunk-handler
-dependency. The backend still needs archive member validation, link/traversal checks,
-private extraction, unpacked-size limits, output collision handling, host/data-path
-configuration and recovery from partial filesystem/database writes. The preflight
-is not automatically enforced by the web flow and does not fix production extraction.
+The approved backend changes create/check destination directories, stage outputs,
+refuse output replacement and coordinate filesystem publication with database writes.
+Original CPDN archive layouts, production paths, naming and GRIB parsing remain the
+established interfaces. The existing active consistency/CRC checks now raise explicit
+ValueError exceptions and remain effective when Python optimization is enabled.
 
-Python processing/metadata semantics are unchanged. Restoring authenticated transport
-and serializing backend requests does not make filesystem/database changes atomic.
-Use trusted archives pending that backend review; inspect failed operations before
-any new upload attempt. No backend or shared server snapshot is edited here.
+- Initial ZIPs are built in temporary output directories beside their final
+  destinations. Existing filesystem outputs and registered database filenames are rejected before
+  ZIP creation; atomic hard-link publication cannot replace a destination created
+  concurrently. The unique database key still handles concurrent insert races.
+- Ordinary uploads are copied into destination-side staging, preserving the
+  incoming original until success. Missing destination directories are created;
+  a regular file at a required directory path fails before publication.
+- Every initial archive's output rows are registered together in one explicit
+  InnoDB transaction. The backend checks the table engine before writing; it does
+  not change the database schema. This replaces the old commit-per-analysis flow.
+- All inserts precede publication of the staged files, followed by one commit.
+  Staging and destination share a filesystem supporting hard links. On an error
+  before commit, successful rollback is followed by removal of this attempt's
+  published files, identified by their staging inode. Existing files are retained.
+- A private .oifs-publication-*.json record in incoming storage lists the source,
+  staged/final paths and checksums. The record is written before publishing files;
+  it contains no credentials or submitted description/SQL values. It supports
+  reconciliation if a worker stops between filesystem and database operations.
+- A raised commit exception has an uncertain outcome: the server may have committed
+  before its response was lost. If commit acknowledgement or rollback fails, retain
+  input, output staging, published files and the recovery record for operator review.
+  Cleanup failure after confirmed rollback also retains a record for reconciliation.
+- After an acknowledged commit, input/staging cleanup problems are logged as warnings
+  and do not report the already-committed publication as failed. Empty destination
+  directories created during a failed attempt may remain; no shared trees are purged.
+
+Filesystem writes and a MySQL commit cannot be one atomic operation. After an
+interruption or recovery-required error, compare the recovery record with actual
+ancillary database rows and filesystem files before deciding to complete cleanup
+or remove unregistered outputs. Do not automatically replay the upload. A leftover
+record may also follow a successful commit whose record cleanup failed. Python
+reports the record path in server-side diagnostics; no automatic recovery command
+or live database/file cleanup is run by this source change.
+
+The backend uses a Python 3 shebang and streaming hashlib MD5 checksums. NumPy and
+the external md5sum executable are no longer required by the upload backend or
+initial-upload preflight. PyMySQL and the existing ecCodes tools remain required.
+Output staging uses additional destination space while retaining incoming data.
+
+The existing test_oifs_file_upload_handler.py fixtures now reflect destination-side
+staging, engine checks and the single transaction per initial upload. Simulated
+filesystem/recovery operations remain confined to temporary fixtures. Existing
+cases were adjusted; no new test cases were added and the suite was not run as
+part of this syntax-only change. Historical test results do not establish runtime
+correctness of the revised publication behaviour.
 
 ## Validation and ownership
 

@@ -377,7 +377,7 @@ try {
             $user->authenticator), $token)) {
         upload_error('Invalid upload ticket.', 403);
     }
-    // The locked Python backend reads the legacy incoming directory below.
+    // The Python backend retains the production incoming directory below.
     // Reject a mismatched site configuration rather than stage files elsewhere.
     $incoming = realpath(PROJECT_PATH . 'tmp_ancil_upload');
     $backend_incoming = realpath('/storage/www/cpdnboinc/tmp_ancil_upload');

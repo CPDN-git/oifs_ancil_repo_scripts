@@ -1,9 +1,8 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 
 import pymysql
 import pymysql.converters
 import os, sys
-import numpy as np 
 import argparse
 import hashlib
 import shutil
@@ -13,6 +12,9 @@ import tarfile
 import subprocess
 import zipfile
 import re
+import json
+import tempfile
+from contextlib import contextmanager
 
 from eccodes_config import discover_eccodes
 
@@ -36,74 +38,204 @@ def connect_database():
     return pymysql.connect(**connection_params)
 
 
-def unpack_upload_file(Args):
-    dates=[]
-    tmp_dir="/storage/www/cpdnboinc/tmp_ancil_upload/"
-    ancil_dir="/storage/cpdn_ancil_files/oifs_ancil_files/"+Args.ancil_type
-    print("Extracting tarfile "+Args.ulfile+" to "+tmp_dir)
-    tar= tarfile.open(tmp_dir+Args.ulfile)
-    tar.extractall(path=tmp_dir)
-    tar.close()
-    rootDir=tmp_dir+Args.exptid
+class PublicationRecoveryRequired(RuntimeError):
+    """Keep staged outputs when database/file state needs operator reconciliation."""
 
-    # Walk the untarred file and create zips.
-    for dirName, subdirList, fileList in os.walk(rootDir, topdown=True):             
-        if dirName==rootDir:
-            dates=subdirList
-        date=dirName.split('/')[-1]
-        if date in dates:
-            analysis_nos=[i for i in subdirList if i != 'ecmwf']
-            if 'ecmwf' in subdirList:
-                print("Removing ecmwf directory...")
-                shutil.rmtree(dirName+'/ecmwf')
-            if analysis_nos==[]:
-                analysis_no='00'
-                zipname="ic_"+Args.exptid+"_"+date+"_"+analysis_no
-                adir=ancil_dir+"/"+Args.exptid+"/"+date+"/"+analysis_no+"/"
-                grib_info=get_grib_info(Args.exptid,analysis_no,dirName)
-                if not os.path.exists(adir):
-                    os.makedirs(adir)
-                print("Making zipfile "+zipname)
-                shutil.make_archive(adir+zipname,"zip",dirName)
-    
-                md5_info=subprocess.check_output(['md5sum',adir+zipname+'.zip'],text=True)
-                md5sum=md5_info.split()[0]
-                query, parameters=get_query(Args,grib_info,zipname+'.zip',md5sum)
+
+def file_md5(filename):
+    """Hash large files incrementally, without a separate md5sum executable."""
+    digest = hashlib.md5()
+    with open(filename, 'rb') as stream:
+        for block in iter(lambda: stream.read(1024 * 1024), b''):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+@contextmanager
+def staged_outputs():
+    """Own temporary output directories, retaining them only for manual recovery."""
+    directories = []
+    keep = False
+    try:
+        yield directories
+    except PublicationRecoveryRequired:
+        keep = True
+        raise
+    finally:
+        if not keep:
+            for directory in directories:
                 try:
-                    print("Adding "+zipname+".zip to the database")
-                    cursor.execute(query, parameters)
-                    db.commit()
-                except Exception:
-                    # Stop before success cleanup; retain files for recovery review.
-                    db.rollback()
-                    raise
+                    shutil.rmtree(directory)
+                except OSError as error:
+                    print('Warning: could not remove output staging directory '
+                          + directory + ': ' + str(error), file=sys.stderr)
 
-            else:
-                for analysis_no in analysis_nos:
-                    zipname="ic_"+Args.exptid+"_"+date+"_"+analysis_no
-                    adir=ancil_dir+"/"+Args.exptid+"/"+date+"/"+analysis_no+"/"
-                    grib_info=get_grib_info(Args.exptid,analysis_no,dirName+"/"+analysis_no)
-                    if not os.path.exists(adir):
-                        os.makedirs(adir)
-                    print("Making zipfile "+zipname)
-                    shutil.make_archive(adir+zipname,"zip",dirName+"/"+analysis_no)
-    
-                    md5_info=subprocess.check_output(['md5sum',adir+zipname+'.zip'],text=True)
-                    md5sum=md5_info.split()[0]
-                    query, parameters=get_query(Args,grib_info,zipname+'.zip',md5sum)
-                    try:
-                        print("Adding "+zipname+".zip to the database")
-                        cursor.execute(query, parameters)
-                        db.commit()
-                    except Exception:
-                        # Stop before success cleanup; retain files for recovery review.
-                        db.rollback()
-                        raise
 
-    # Cleaning up tmp_dir
-    print("Cleaning up")
-    os.remove(tmp_dir+Args.ulfile)
-    shutil.rmtree(tmp_dir+Args.exptid)
+def stage_destination(destination, directories):
+    """Create the destination directory and reserve private output staging beside it."""
+    if os.path.lexists(destination):
+        raise FileExistsError('Ancillary output already exists: ' + destination)
+    cursor.execute('SELECT file_name FROM oifs_ancil_files WHERE file_name = %s LIMIT 1',
+                   (os.path.basename(destination),))
+    if cursor.fetchone() is not None:
+        raise FileExistsError('Ancillary filename is already registered: ' + os.path.basename(destination))
+    parent = os.path.dirname(destination)
+    os.makedirs(parent, exist_ok=True)
+    if not os.path.isdir(parent):
+        raise NotADirectoryError('Ancillary destination is not a directory: ' + parent)
+    directory = tempfile.mkdtemp(prefix='.oifs-output-', dir=parent)
+    directories.append(directory)
+    return os.path.join(directory, os.path.basename(destination))
+
+
+def write_recovery_record(filename, record):
+    """Replace our recovery record atomically; never record credentials or SQL values."""
+    descriptor, temporary = tempfile.mkstemp(prefix='.oifs-record-',
+                                           dir=os.path.dirname(filename))
+    try:
+        with os.fdopen(descriptor, 'w', encoding='utf-8') as stream:
+            json.dump(record, stream, indent=2)
+            stream.write('\n')
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, filename)
+    finally:
+        if os.path.exists(temporary):
+            os.remove(temporary)
+
+
+def publish_outputs(plans, source):
+    """Publish staged files and register one upload in one database transaction.
+
+    Filesystem publication and a MySQL commit cannot be one atomic operation.
+    Remove our files after confirmed rollback before commit is attempted. Retain
+    them and the recovery record if commit acknowledgement/rollback is uncertain.
+    """
+    if not plans:
+        raise ValueError('No ancillary outputs were produced; the upload is retained.')
+    # Rollback must be supported; do not silently rely on a nontransactional table.
+    cursor.execute('SHOW TABLE STATUS WHERE Name = %s', ('oifs_ancil_files',))
+    table = cursor.fetchone()
+    if not table or str(table['Engine']).upper() != 'INNODB':
+        raise RuntimeError('Ancillary publication requires an InnoDB oifs_ancil_files table.')
+
+    descriptor, recovery = tempfile.mkstemp(prefix='.oifs-publication-', suffix='.json',
+                                          dir=os.path.dirname(source))
+    os.close(descriptor)
+    record = {'source': source, 'state': 'prepared', 'outputs': [
+        {'staged': plan['staged'], 'destination': plan['destination'], 'md5': plan['md5']}
+        for plan in plans]}
+    transaction_started = False
+    commit_attempted = False
+    try:
+        write_recovery_record(recovery, record)
+        db.begin()
+        transaction_started = True
+        for plan in plans:
+            cursor.execute(plan['query'], plan['parameters'])
+        for plan in plans:
+            # Staging is on the destination filesystem. link() publishes complete
+            # bytes atomically and fails if ANY destination entry already exists.
+            os.link(plan['staged'], plan['destination'])
+        record['state'] = 'commit_pending'
+        write_recovery_record(recovery, record)
+        commit_attempted = True
+        db.commit()
+    except BaseException as error:
+        rollback_error = None
+        if transaction_started:
+            try:
+                db.rollback()
+            except Exception as failure:
+                rollback_error = failure
+        if commit_attempted or rollback_error is not None:
+            detail = ('; rollback also failed: ' + str(rollback_error)) if rollback_error else ''
+            raise PublicationRecoveryRequired(
+                'Publication outcome needs manual review' + detail
+                + '. Input and outputs retained. Recovery record: ' + recovery) from error
+        cleanup_errors = []
+        for plan in plans:
+            try:
+                # Never remove a pre-existing file or a replacement made elsewhere.
+                if os.path.lexists(plan['destination']) and os.path.samestat(
+                        os.stat(plan['staged']), os.stat(plan['destination'], follow_symlinks=False)):
+                    os.remove(plan['destination'])
+            except OSError as failure:
+                cleanup_errors.append(str(failure))
+        if cleanup_errors:
+            raise PublicationRecoveryRequired(
+                'Database rollback completed, but output cleanup needs manual review: '
+                + '; '.join(cleanup_errors) + '. Recovery record: ' + recovery) from error
+        try:
+            os.remove(recovery)
+        except OSError as failure:
+            print('Warning: rolled back; recovery record could not be removed: '
+                  + recovery + ': ' + str(failure), file=sys.stderr)
+        raise
+    else:
+        try:
+            os.remove(recovery)
+        except OSError as error:
+            print('Warning: publication committed; remove the recovery record after review: '
+                  + recovery + ': ' + str(error), file=sys.stderr)
+
+
+def remove_completed_input(filename, directory=None):
+    """Cleanup after an acknowledged commit must not turn success into a retry."""
+    for path, remove in ((filename, os.remove), (directory, shutil.rmtree)):
+        if path is None:
+            continue
+        try:
+            remove(path)
+        except OSError as error:
+            print('Warning: publication committed; input cleanup needs review: '
+                  + path + ': ' + str(error), file=sys.stderr)
+
+
+def unpack_upload_file(Args):
+    dates = []
+    tmp_dir = '/storage/www/cpdnboinc/tmp_ancil_upload/'
+    ancil_dir = '/storage/cpdn_ancil_files/oifs_ancil_files/' + Args.ancil_type
+    source = tmp_dir + Args.ulfile
+    print('Extracting tarfile ' + Args.ulfile + ' to ' + tmp_dir)
+    with tarfile.open(source) as tar:
+        tar.extractall(path=tmp_dir)
+    rootDir = tmp_dir + Args.exptid
+
+    # Walk the untarred file and create zips. Preserve explicit analysis directories
+    # and the implicit single-analysis value 00 used by the original implementation.
+    with staged_outputs() as directories:
+        plans = []
+        for dirName, subdirList, fileList in os.walk(rootDir, topdown=True):
+            if dirName == rootDir:
+                dates = subdirList
+            date = dirName.split('/')[-1]
+            if date in dates:
+                analysis_nos = [i for i in subdirList if i != 'ecmwf']
+                if 'ecmwf' in subdirList:
+                    print('Removing ecmwf directory...')
+                    shutil.rmtree(dirName + '/ecmwf')
+                analyses = [(number, dirName + '/' + number) for number in analysis_nos]
+                if not analyses:
+                    analyses = [('00', dirName)]
+                for analysis_no, analysis_dir in analyses:
+                    zipname = 'ic_' + Args.exptid + '_' + date + '_' + analysis_no
+                    adir = ancil_dir + '/' + Args.exptid + '/' + date + '/' + analysis_no + '/'
+                    destination = adir + zipname + '.zip'
+                    if os.path.lexists(destination):
+                        raise FileExistsError('Ancillary output already exists: ' + destination)
+                    grib_info = get_grib_info(Args.exptid, analysis_no, analysis_dir)
+                    staged = stage_destination(destination, directories)
+                    print('Making zipfile ' + zipname)
+                    shutil.make_archive(staged[:-4], 'zip', analysis_dir)
+                    md5sum = file_md5(staged)
+                    query, parameters = get_query(Args, grib_info, zipname + '.zip', md5sum)
+                    plans.append({'staged': staged, 'destination': destination,
+                                  'query': query, 'parameters': parameters, 'md5': md5sum})
+        # No initial ZIP or database row is committed independently of this upload.
+        publish_outputs(plans, source)
+    print('Cleaning up')
+    remove_completed_input(source, rootDir)
 
 def consistency_check(ic_files,exptid,ddir):
     print("Performing consistency check")
@@ -123,11 +255,14 @@ def consistency_check(ic_files,exptid,ddir):
         start_date=line[1]+hour
         start_dates.append(start_date)
     # print("Experiment IDs: ",set(expts))
-    assert(len(set(expts))==1),"Inconsistent experiment IDs in initial files"
-    assert(expts[0]==exptid),"Experiment ID (%s) is inconsistent with grib files (%s)" %(exptid,expts[0])
+    if len(set(expts)) != 1:
+        raise ValueError("Inconsistent experiment IDs in initial files")
+    if expts[0] != exptid:
+        raise ValueError("Experiment ID (%s) is inconsistent with grib files (%s)" % (exptid, expts[0]))
      
     # print("Start dates: ",set(start_dates))
-    assert(len(set(start_dates))==1),"Inconsistent start dates in initial files"
+    if len(set(start_dates)) != 1:
+        raise ValueError("Inconsistent start dates in initial files")
      
     return start_dates[0]
     
@@ -219,7 +354,8 @@ def get_grib_info(exptid,analysis_no,ddir):
         ICMGGUA_grid=""
         ICMGGUA_hres=""
 
-    assert (ICMGGUA_hres==ICMGG_hres),"Horizontal resolution in ICMGG grib file (%s) is inconsistent with Upper Air ICMGG grib file (%s)" %(ICMGG_hres,ICMGGUA_hres)
+    if ICMGGUA_hres != ICMGG_hres:
+        raise ValueError("Horizontal resolution in ICMGG grib file (%s) is inconsistent with Upper Air ICMGG grib file (%s)" % (ICMGG_hres, ICMGGUA_hres))
     
     file_info["gridpoint_horizontal_resolution"]=ICMGG_hres
 
@@ -268,49 +404,47 @@ def get_query(Vars,GribInfo,fname,md5sum):
 
 
 def upload_file(Vars):
-    tmp_dir="/storage/www/cpdnboinc/tmp_ancil_upload/"
-    if Vars.ancil_type!="fullpos_namelist":
-        ulfile_zip=zipfile.ZipFile(tmp_dir+Vars.ulfile)
-        ret=ulfile_zip.testzip()
-        assert(ret is None),"Bad zip file. First bad file in zip: %s" % ret
+    tmp_dir = '/storage/www/cpdnboinc/tmp_ancil_upload/'
+    source = tmp_dir + Vars.ulfile
+    if Vars.ancil_type != 'fullpos_namelist':
+        with zipfile.ZipFile(source) as archive:
+            ret = archive.testzip()
+        if ret is not None:
+            raise ValueError('Bad zip file. First bad file in zip: %s' % ret)
 
-    print("Uploading file...")    
-    ancil_dir="/storage/cpdn_ancil_files/oifs_ancil_files/"+Vars.ancil_type
-    md5_info=subprocess.check_output(['md5sum',tmp_dir+Vars.ulfile],text=True)
-    md5sum=md5_info.split()[0]
-   
-    grid_hres_parts=re.split('(\d.*)',Vars.grid_hres)
+    print('Uploading file...')
+    ancil_dir = '/storage/cpdn_ancil_files/oifs_ancil_files/' + Vars.ancil_type
+    md5sum = file_md5(source)
+    grid_hres_parts = re.split(r'(\d.*)', Vars.grid_hres)
 
-    if Vars.ancil_type=="ifsdata":
-        adir=ancil_dir+"/"+Vars.sub_type
-        url = "https://"+site+".cpdn.org/oifs_ancil_files/"+Vars.ancil_type+"/"+Vars.sub_type+"/"+Vars.ulfile
+    if Vars.ancil_type == 'ifsdata':
+        adir = ancil_dir + '/' + Vars.sub_type
+        url = 'https://' + site + '.cpdn.org/oifs_ancil_files/' + Vars.ancil_type + '/' + Vars.sub_type + '/' + Vars.ulfile
     else:
-        adir=ancil_dir
-        url = "https://"+site+".cpdn.org/oifs_ancil_files/"+Vars.ancil_type+"/"+Vars.ulfile
+        adir = ancil_dir
+        url = 'https://' + site + '.cpdn.org/oifs_ancil_files/' + Vars.ancil_type + '/' + Vars.ulfile
     query = (
-        "INSERT INTO oifs_ancil_files ("
-        "file_name, created_by, uploaded_by, description, ancil_type, "
-        "ancil_sub_type, model_version_number, grid_type, "
-        "spectral_horizontal_resolution, md5sum, url) "
-        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+        'INSERT INTO oifs_ancil_files ('
+        'file_name, created_by, uploaded_by, description, ancil_type, '
+        'ancil_sub_type, model_version_number, grid_type, '
+        'spectral_horizontal_resolution, md5sum, url) '
+        'VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)'
     )
     parameters = (
         Vars.ulfile, Vars.created_by, Vars.uploaded_by, Vars.file_desc,
         Vars.ancil_type, Vars.sub_type, Vars.model_version,
         grid_hres_parts[0], grid_hres_parts[1], md5sum, url,
     )
-    try:
-        print("Adding "+Vars.ulfile+" to the database")
-        cursor.execute(query, parameters)
-        print("Moving file into the repository...")
-        shutil.move(tmp_dir+Vars.ulfile,adir)
-        db.commit()
-    except Exception:
-        db.rollback()
-        raise
+    destination = os.path.join(adir, Vars.ulfile)
+    with staged_outputs() as directories:
+        staged = stage_destination(destination, directories)
+        # Retain the incoming file until both destination publication and DB commit
+        # succeed. copy2 preserves the original mode/timestamps, as a move did.
+        shutil.copy2(source, staged)
+        publish_outputs([{'staged': staged, 'destination': destination,
+                          'query': query, 'parameters': parameters, 'md5': md5sum}], source)
+    remove_completed_input(source)
 
-    
-    
 
 #Main controling function
 def main():

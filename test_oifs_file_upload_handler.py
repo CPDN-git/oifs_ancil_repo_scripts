@@ -38,8 +38,7 @@ def load_backend():
     pymysql.converters = converters
     pymysql.cursors = types.SimpleNamespace(DictCursor=object())
     pymysql.connect = Mock(side_effect=AssertionError('Unexpected DB access'))
-    replacements = {'pymysql': pymysql, 'pymysql.converters': converters,
-                    'numpy': types.ModuleType('numpy')}
+    replacements = {'pymysql': pymysql, 'pymysql.converters': converters}
     spec = importlib.util.spec_from_file_location('_upload_backend_fixture', BACKEND)
     backend = importlib.util.module_from_spec(spec)
     with patch.dict(sys.modules, replacements), warnings.catch_warnings():
@@ -55,6 +54,7 @@ def load_backend():
 CLI_RUNNER = r'''
 import atexit
 import importlib.util
+from contextlib import nullcontext
 import json
 from pathlib import Path
 import sys
@@ -69,16 +69,22 @@ atexit.register(lambda: Path(record_path).write_text(json.dumps(state)))
 
 class Cursor:
     def execute(self, query, parameters):
+        if query.startswith('SHOW TABLE STATUS'):
+            return 1
         state['executions'].append([query, parameters])
         if scenario in ('execute-fail', 'implicit-execute-fail') or (scenario == 'second-execute-fail' and len(state['executions']) == 2):
             raise RuntimeError('simulated insert failure')
         return 1
+    def fetchone(self):
+        return {'Engine': 'InnoDB'}
     def close(self):
         state['cursor_closed'] = True
         if scenario == 'cursor-close-fail':
             raise RuntimeError('simulated cursor close failure')
 
 class Database:
+    def begin(self):
+        pass
     def cursor(self, kind):
         if scenario == 'cursor-fail':
             raise RuntimeError('simulated cursor creation failure')
@@ -109,7 +115,7 @@ converters.conversions = {}
 pymysql.converters = converters
 pymysql.cursors = types.SimpleNamespace(DictCursor=object())
 pymysql.connect = connect
-sys.modules.update({'pymysql': pymysql, 'pymysql.converters': converters, 'numpy': types.ModuleType('numpy')})
+sys.modules.update({'pymysql': pymysql, 'pymysql.converters': converters})
 spec = importlib.util.spec_from_file_location('upload_cli_fixture', backend_path)
 backend = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(backend)
@@ -118,17 +124,64 @@ tree = backend.ET.ElementTree(backend.ET.fromstring(xml))
 backend.ET.parse = lambda path: tree
 backend.discover_eccodes = lambda: ('/fixture/grib_ls', '/fixture/definitions')
 backend.subprocess.check_output = lambda *args, **kwargs: '0123456789abcdef  fixture\n'
-backend.zipfile.ZipFile = lambda *args, **kwargs: types.SimpleNamespace(testzip=lambda: None)
-backend.tarfile.open = lambda *args, **kwargs: types.SimpleNamespace(extractall=lambda **kwargs: None, close=lambda: None)
-backend.os.path.exists = lambda path: True
-backend.os.remove = lambda path: state['removed'].append(path)
-backend.shutil.rmtree = lambda path: state['rmtree'].append(path)
-backend.shutil.make_archive = lambda path, *args: state['archives'].append(path)
-def move(source, destination):
+backend.zipfile.ZipFile = lambda *args, **kwargs: nullcontext(types.SimpleNamespace(testzip=lambda: None))
+backend.tarfile.open = lambda *args, **kwargs: nullcontext(types.SimpleNamespace(extractall=lambda **kwargs: None))
+backend.file_md5 = lambda path: '0123456789abcdef'
+# Keep all staged files, links and recovery records inside this child fixture.
+fixture = Path(record_path).parent/'files'
+fixture.mkdir()
+real_mkstemp = backend.tempfile.mkstemp
+real_link = backend.os.link
+real_stat = backend.os.stat
+real_lexists = backend.os.path.lexists
+real_remove = backend.os.remove
+real_rmtree = backend.shutil.rmtree
+
+def mapped(path):
+    return str(fixture/str(path).lstrip('/')) if str(path).startswith('/storage/') else path
+
+def mkstemp(*args, **kwargs):
+    kwargs['dir'] = str(fixture)
+    return real_mkstemp(*args, **kwargs)
+backend.tempfile.mkstemp = mkstemp
+backend.os.stat = lambda path, *args, **kwargs: real_stat(mapped(path), *args, **kwargs)
+backend.os.path.lexists = lambda path: real_lexists(mapped(path))
+
+def stage(destination, directories):
+    directory = fixture/('stage-'+str(len(directories)))
+    directory.mkdir()
+    directories.append(str(directory))
+    return str(directory/Path(destination).name)
+backend.stage_destination = stage
+
+def remove(path):
+    if str(path).startswith('/storage/www/cpdnboinc/tmp_ancil_upload/'):
+        state['removed'].append(path)
+    else:
+        real_remove(mapped(path))
+backend.os.remove = remove
+
+def rmtree(path, *args, **kwargs):
+    if str(path).startswith('/storage/www/cpdnboinc/tmp_ancil_upload/'):
+        state['rmtree'].append(path)
+    else:
+        real_rmtree(path, *args, **kwargs)
+backend.shutil.rmtree = rmtree
+
+def archive(path, *args):
+    state['archives'].append(path)
+    Path(path+'.zip').write_bytes(b'fixture ZIP bytes')
+backend.shutil.make_archive = archive
+backend.shutil.copy2 = lambda source, destination: Path(destination).write_bytes(b'fixture payload')
+
+def publish(source, destination):
     if scenario in ('move-fail', 'rollback-fail'):
         raise OSError('simulated move failure')
+    target = Path(mapped(destination))
+    target.parent.mkdir(parents=True, exist_ok=True)
+    real_link(source, target)
     state['moved'].append([source, destination])
-backend.shutil.move = move
+backend.os.link = publish
 root = '/storage/www/cpdnboinc/tmp_ancil_upload/AB12'
 analyses = [] if scenario.startswith('implicit-') else ['00', '01']
 backend.os.walk = lambda *args, **kwargs: iter([(root, ['2026010100'], []), (root+'/2026010100', analyses, [])])
@@ -184,10 +237,15 @@ class UploadDatabaseTests(unittest.TestCase):
             self.assertEqual(row[3], DESCRIPTION)
 
     def test_ordinary_parameters_round_trip_without_sql_interpolation(self):
-        with patch.object(self.backend.subprocess, 'check_output', return_value='abcdef fixture.nml'), \
-             patch.object(self.backend.shutil, 'move'), contextlib.redirect_stdout(io.StringIO()):
+        with patch.object(self.backend, 'file_md5', return_value='abcdef'), \
+             patch.object(self.backend, 'stage_destination', return_value='fixture.nml'), \
+             patch.object(self.backend.shutil, 'copy2'), \
+             patch.object(self.backend, 'publish_outputs') as publication, \
+             patch.object(self.backend, 'remove_completed_input') as cleanup, \
+             contextlib.redirect_stdout(io.StringIO()):
             self.backend.upload_file(self.arguments('fullpos_namelist'))
-        query, values = self.cursor.execute.call_args.args
+        plan = publication.call_args.args[0][0]
+        query, values = plan['query'], plan['parameters']
         self.assertEqual(query.count('%s'), 11)
         self.assertEqual(len(values), 11)
         self.assertNotIn(CREATOR, query)
@@ -197,8 +255,8 @@ class UploadDatabaseTests(unittest.TestCase):
             db.execute(query.replace('%s', '?'), values)
             row = db.execute('SELECT created_by, description FROM oifs_ancil_files').fetchone()
             self.assertEqual(row, (CREATOR, DESCRIPTION))
-        self.db.commit.assert_called_once_with()
-        self.db.rollback.assert_not_called()
+        publication.assert_called_once()
+        cleanup.assert_called_once_with('/storage/www/cpdnboinc/tmp_ancil_upload/fixture.nml')
 
     def run_cli(self, scenario, kind='fullpos_namelist'):
         with tempfile.TemporaryDirectory(prefix='oifs-db-test-') as directory:
@@ -244,15 +302,15 @@ class UploadDatabaseTests(unittest.TestCase):
                 result, state = self.run_cli(scenario, 'ic_ancil')
                 self.assert_failure(result)
                 self.assertEqual(len(state['executions']), 1)
-                self.assertEqual(len(state['archives']), 1)
+                self.assertEqual(len(state['archives']), 1 if scenario.startswith('implicit-') else 2)
                 self.assertEqual(state['rollbacks'], 1)
                 self.assertEqual(state['removed'], [])
                 self.assertEqual(state['rmtree'], [])
 
-    def test_initial_second_insert_failure_stops_after_prior_commit(self):
+    def test_initial_second_insert_failure_rolls_back_entire_upload(self):
         result, state = self.run_cli('second-execute-fail', 'ic_ancil')
         self.assert_failure(result)
-        self.assertEqual(state['commits'], 1)
+        self.assertEqual(state['commits'], 0)
         self.assertEqual(state['rollbacks'], 1)
         self.assertEqual(state['removed'], [])
         self.assertEqual(state['rmtree'], [])

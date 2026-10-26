@@ -187,11 +187,8 @@ def main():
         if not private.is_dir() or private.stat().st_mode & 0o077:
             raise RuntimeError('Existing private upload storage must exclude group/other access.')
     import pymysql
-    import numpy
     print('Python:', sys.version.split()[0], '; interpreter:', sys.executable)
-    print('Packages: PyMySQL', getattr(pymysql, '__version__', 'installed'), '; NumPy', numpy.__version__)
-    if shutil.which('md5sum') is None:
-        raise RuntimeError('md5sum is not available in PATH.')
+    print('Packages: PyMySQL', getattr(pymysql, '__version__', 'installed'))
     sys.path.insert(0, str(args.scripts.resolve()))
     backend_path = args.scripts/'oifs_file_upload_handler.py'
     # Refuse the old module, which opened a database connection during import.
